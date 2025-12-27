@@ -31,7 +31,7 @@ export async function registerUserAction(name: string, email: string, password: 
         return { success: true };
     } catch (error) {
         console.error('Registration failed:', error);
-        return { success: false, error: 'Database Error' };
+        return { success: false, error: error instanceof Error ? error.message : 'Database Error' };
     }
 }
 
