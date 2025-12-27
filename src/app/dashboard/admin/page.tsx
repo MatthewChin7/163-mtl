@@ -15,7 +15,7 @@ export default function AdminPage() {
     return (
         <div>
             <h1 style={{ fontSize: '1.875rem', fontWeight: 700, marginBottom: '2rem' }}>Administration</h1>
-            <UserManagement users={allUsers} currentUser={user} />
+            <UserManagement currentUser={user} />
         </div>
     );
 }
