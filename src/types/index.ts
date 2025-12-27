@@ -112,11 +112,7 @@ export interface Indent {
     transportOperator?: string; // Optional until assigned
     reason?: string;
     specialInstructions?: string;
-    approverSkipList: UserRole[]; // Who has already approved and didn't edit
     previousStatus?: IndentStatus; // To restore context if needed
-
-    // Cancellation
-    cancellationReason?: string;
 }
 
 export interface RoleRequest {
