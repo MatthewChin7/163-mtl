@@ -44,7 +44,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
     const handleRequestDecision = (reqId: string, decision: 'APPROVED' | 'REJECTED') => {
         const req = roleRequests.find(r => r.id === reqId);
         if (req) {
-            db.roleRequests.update(reqId, { status: decision });
+            db.roleRequests.update(reqId, decision);
             if (decision === 'APPROVED') {
                 db.users.update(req.userId, { role: req.requestedRole });
             }
