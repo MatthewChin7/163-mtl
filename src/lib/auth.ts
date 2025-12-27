@@ -5,29 +5,53 @@ import { db } from './store';
 let currentUser: User | null = null;
 
 export const auth = {
-    login: (userId: string): User | null => {
-        const user = db.users.getById(userId);
+    login: (email: string, role?: UserRole, password?: string): User | null => { // role param kept for legacy compatibility but password preferred
+        const users = db.users.getAll();
+        const user = users.find(u => u.email === email && (password ? u.password === password : true));
+
         if (user) {
-            currentUser = user;
-            // In a real app, we'd set a cookie/token here
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('163-user', JSON.stringify(user));
+            if (user.status !== 'ACTIVE') {
+                console.warn('User pending approval');
+                return null; // Handle UI feedback separately if needed, currently returns null generic failure
             }
+            currentUser = user;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('currentUser', JSON.stringify(user));
+            }
+            return user;
         }
-        return currentUser;
+        return null;
+    },
+
+    register: (name: string, email: string, password: string): boolean => {
+        const users = db.users.getAll();
+        if (users.some(u => u.email === email)) return false; // Email taken
+
+        const newUser: User = {
+            id: crypto.randomUUID(),
+            name,
+            email,
+            password,
+            role: 'REQUESTOR', // Default role
+            status: 'PENDING',
+            unit: 'Unknown'
+        };
+
+        db.users.add(newUser);
+        return true;
     },
 
     logout: () => {
         currentUser = null;
         if (typeof window !== 'undefined') {
-            localStorage.removeItem('163-user');
+            localStorage.removeItem('currentUser');
         }
     },
 
     getCurrentUser: (): User | null => {
         // Try to rehydrate from storage if on client
         if (!currentUser && typeof window !== 'undefined') {
-            const stored = localStorage.getItem('163-user');
+            const stored = localStorage.getItem('currentUser');
             if (stored) {
                 currentUser = JSON.parse(stored);
             }

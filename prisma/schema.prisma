@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("PRISMA_DATABASE_URL") // uses connection pooling with Prisma Accelerate
+  directUrl = env("POSTGRES_URL") // uses a direct connection
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  REQUESTOR
+  APPROVER_AS3
+  APPROVER_S3
+  APPROVER_MTC
+}
+
+enum IndentStatus {
+  DRAFT
+  PENDING_REQUESTOR
+  PENDING_AS3
+  PENDING_S3
+  PENDING_MTC
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum VehicleType {
+  OUV
+  S_OUV
+  LUV
+  MSV_8x8
+  LM_8x8
+  DLS_8x8
+  MWEC_8x8
+  TCP_6x6
+  GS_6TON
+  SKIDTANKER_5TON
+  GP_CAR
+  MINIBUS
+  OTHER
+}
+
+// Models
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String    // Hashed
+  role          UserRole  @default(REQUESTOR)
+  rank          String?
+  unit          String?   @default("163 SQN")
+  status        String    @default("PENDING") // ACTIVE, PENDING, REJECTED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  indents       Indent[]
+  roleRequests  RoleRequest[]
+}
+
+model Indent {
+  id            String    @id @default(cuid())
+  serialNumber  Int       @default(autoincrement())
+  
+  // Relations
+  requestor     User      @relation(fields: [requestorId], references: [id])
+  requestorId   String
+
+  // Core Data
+  status        IndentStatus @default(DRAFT)
+  vehicleType   VehicleType
+  vehicleTypeOther String?
+  vehicleNumber String?
+  equipmentNumber String?
+
+  startTime     DateTime
+  endTime       DateTime
+  
+  // Locations
+  startLocationCategory String
+  startLocation         String
+  startLocationOther    String?
+  
+  endLocationCategory   String
+  endLocation           String
+  endLocationOther      String?
+  
+  // JSON Fields for complexity
+  waypoints     Json?     // Stored as Array of Waypoint objects
+  approvalLogs  Json?     // Stored as Array of Logs
+
+  // Details
+  purpose       String
+  typeOfIndent  String    // MTC_SUPPORT, SELF_DRIVE etc
+  
+  // Personnel
+  vehicleCommanderName String
+  transportOperator    String?
+  
+  reason               String?
+  specialInstructions  String?
+  cancellationReason   String?
+
+  // RPL
+  rplTimingDepart      String?
+  rplTimingArrive      String?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model RoleRequest {
+  id            String    @id @default(cuid())
+  user          User      @relation(fields: [userId], references: [id])
+  userId        String
+  
+  currentRole   UserRole
+  requestedRole UserRole
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  createdAt     DateTime  @default(now())
+}

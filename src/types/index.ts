@@ -7,6 +7,8 @@ export interface User {
     role: UserRole;
     rank?: string;
     unit?: string;
+    status: 'ACTIVE' | 'PENDING' | 'REJECTED';
+    password?: string; // For mock auth
 }
 
 export type IndentStatus =
