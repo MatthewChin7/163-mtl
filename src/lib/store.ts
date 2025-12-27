@@ -2,11 +2,11 @@ import { Indent, User, RoleRequest, DailyDutyDO } from '@/types';
 
 // Mock Data
 const MOCK_USERS: User[] = [
-    { id: 'u1', name: 'Recruit Chau', role: 'REQUESTOR', rank: 'REC', unit: '163 SQN', email: 'chau@163.mil' },
-    { id: 'u2', name: 'LTA Tan', role: 'APPROVER_AS3', rank: 'LTA', unit: '163 SQN', email: 'tan@163.mil' },
-    { id: 'u3', name: 'MAJ Lee', role: 'APPROVER_S3', rank: 'MAJ', unit: 'HQ', email: 'lee@163.mil' },
-    { id: 'u4', name: 'WO Lim', role: 'APPROVER_MTC', rank: 'MSG', unit: 'MTC', email: 'lim@163.mil' },
-    { id: 'u5', name: '163 Ops Controller', role: 'ADMIN', email: 'ops@163.mil', rank: 'CPT' },
+    { id: 'u1', name: 'Recruit Chau', role: 'REQUESTOR', rank: 'REC', unit: '163 SQN', email: 'chau@163.mil', status: 'ACTIVE' },
+    { id: 'u2', name: 'LTA Tan', role: 'APPROVER_AS3', rank: 'LTA', unit: '163 SQN', email: 'tan@163.mil', status: 'ACTIVE' },
+    { id: 'u3', name: 'MAJ Lee', role: 'APPROVER_S3', rank: 'MAJ', unit: 'HQ', email: 'lee@163.mil', status: 'ACTIVE' },
+    { id: 'u4', name: 'WO Lim', role: 'APPROVER_MTC', rank: 'MSG', unit: 'MTC', email: 'lim@163.mil', status: 'ACTIVE' },
+    { id: 'u5', name: '163 Ops Controller', role: 'ADMIN', email: 'ops@163.mil', rank: 'CPT', status: 'ACTIVE' },
 ];
 
 let indents: Indent[] = [];
