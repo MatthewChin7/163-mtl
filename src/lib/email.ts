@@ -1,8 +1,8 @@
 import { Resend } from 'resend';
 
 // Initialize Resend with the API key
-// In production, ensure process.env.RESEND_API_KEY is set
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Use a placeholder if missing to prevent build crash (Vercel build env)
+const resend = new Resend(process.env.RESEND_API_KEY || 're_123');
 
 const EMAIL_FROM = 'MTC Platform <onboarding@resend.dev>'; // Resend's testing domain
 const ADMIN_EMAIL = 'admin@163.mil'; // Change this to real admin email if we have one, or just hardcode for demo
