@@ -4,7 +4,7 @@ import { ReactNode, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { User } from '@/types';
-import { LogOut, PieChart, PlusCircle, FileText, Settings, Menu, Calendar, User as UserIcon, Users } from 'lucide-react';
+import { LogOut, PieChart, PlusCircle, FileText, Settings, Menu, Calendar, User as UserIcon, Users, BarChart3, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface DashboardLayoutProps {
@@ -46,8 +46,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             ]
         },
         { label: 'Daily MT Schedule', href: '/dashboard/schedule', icon: Calendar },
+        { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
         { label: 'Monthly Bulk Indents', href: '/dashboard/bulk-indents', icon: FileText, role: 'APPROVER_AS3' },
         { label: 'In Camp TO Sched', href: '/dashboard/mtc-schedule', icon: UserIcon, role: 'APPROVER_MTC' },
+        { label: 'Help Center', href: '/dashboard/help', icon: HelpCircle },
         { label: 'User Management', href: '/dashboard/admin', icon: Users, role: 'ADMIN' },
         { label: 'System Config', href: '/dashboard/admin/config', icon: Settings, role: 'ADMIN' },
     ];
@@ -76,6 +78,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         // Custom logic for Monthly Bulk: Visible to AS3, S3, MTC
                         if (item.label === 'Monthly Bulk Indents') {
                             if (!['APPROVER_AS3', 'APPROVER_S3', 'APPROVER_MTC'].includes(user.role)) return null;
+                        }
+                        else if (item.label === 'Analytics') {
+                            if (!['ADMIN', 'APPROVER_AS3', 'APPROVER_S3', 'APPROVER_MTC'].includes(user.role)) return null;
                         }
                         else if (item.role && user.role !== item.role && user.role !== 'ADMIN') return null;
 
