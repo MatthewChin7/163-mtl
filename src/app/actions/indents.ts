@@ -25,7 +25,7 @@ export async function createIndent(data: any, userId: string, initialStatus: Ind
         return { success: true };
     } catch (error) {
         console.error('Failed to create indent:', error);
-        return { success: false, error: 'Database Error' };
+        return { success: false, error: error instanceof Error ? error.message : 'Database Error' };
     }
 }
 
