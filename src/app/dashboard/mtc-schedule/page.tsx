@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Indent } from '@/types';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, User as UserIcon } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
-import { getIndents } from '@/app/actions/indents';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Save, Loader2 } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isWeekend } from 'date-fns';
 import { getDutyRoster, updateDutyRoster } from '@/app/actions/schedule';
 
 interface DutyRosterEntry {
@@ -16,57 +14,59 @@ interface DutyRosterEntry {
 export default function MtcSchedulePage() {
     const { data: session } = useSession();
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [indents, setIndents] = useState<Indent[]>([]);
     const [roster, setRoster] = useState<DutyRosterEntry[]>([]);
     const [editingRoster, setEditingRoster] = useState<{ [date: string]: string }>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // MTC Role Check
     const isMTC = session?.user?.role === 'APPROVER_MTC';
 
     useEffect(() => {
         loadData();
+        setEditingRoster({});
+        setHasUnsavedChanges(false);
     }, [currentMonth]);
 
     const loadData = async () => {
-        // Calculate range for fetching
         const monthStart = startOfMonth(currentMonth);
         const monthEnd = endOfMonth(currentMonth);
-
-        // Fetch Indents (we filter locally for now, optimization: server filter)
-        // Ideally getIndents should accept date range, but we'll fetch all active for demo or stick to simple
-        // For efficiency in production we'd add range params to getIndents. 
-        // Calling existing getIndents() which returns list.
-        const allIndents = await getIndents();
-        setIndents(allIndents as unknown as Indent[]);
-
-        // Fetch Roster
-        // We need the full grid range including previous/next month overflow
+        // Get full grid range
         const start = startOfWeek(monthStart, { weekStartsOn: 1 });
         const end = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
         const rosterData = await getDutyRoster(start, end);
         setRoster(rosterData as any);
     };
 
     const handleRosterChange = (dateIso: string, value: string) => {
         setEditingRoster(prev => ({ ...prev, [dateIso]: value }));
+        setHasUnsavedChanges(true);
     };
 
-    const saveRosterEntry = async (date: Date, value: string) => {
-        // Optimistic update logic could go here
-        const res = await updateDutyRoster(date, value);
-        if (res.success) {
-            // Reload to confirm or update local state
-            loadData();
-            // Clear editing state for that key to show saved view
-            const key = date.toISOString();
-            // Optional: keep it editable or show toast
-        } else {
-            alert('Failed to save');
+    const handleSaveAll = async () => {
+        if (!hasUnsavedChanges) return;
+        setIsSaving(true);
+        try {
+            const updates = Object.entries(editingRoster).map(([dateIso, value]) => {
+                return updateDutyRoster(new Date(dateIso), value);
+            });
+
+            await Promise.all(updates);
+
+            await loadData();
+            setEditingRoster({});
+            setHasUnsavedChanges(false);
+            alert('Schedule saved successfully!');
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save schedule.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const getRosterValue = (date: Date) => {
-        // Return active edit or saved value
         if (editingRoster[date.toISOString()] !== undefined) {
             return editingRoster[date.toISOString()];
         }
@@ -79,118 +79,142 @@ export default function MtcSchedulePage() {
         end: endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 })
     });
 
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
     if (!session?.user) return null;
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '2rem' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: '6rem' }}>
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <CalendarIcon className="text-primary" />
-                        In-Camp TO Schedule
+                    <h1 className="text-3xl font-bold flex items-center gap-2 text-red-600">
+                        <CalendarIcon />
+                        {format(currentMonth, 'MMMM yyyy').toUpperCase()}
                     </h1>
-                    <p className="text-gray-500">Manage daily duty personnel and view transport volume.</p>
+                    <p className="text-gray-500 mt-1">Manage daily duty personnel.</p>
                 </div>
                 <div className="flex items-center gap-4 bg-white p-1 rounded-lg border shadow-sm">
                     <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-gray-100 rounded">
                         <ChevronLeft size={20} />
                     </button>
-                    <span className="font-bold text-lg w-40 text-center select-none">
-                        {format(currentMonth, 'MMMM yyyy')}
-                    </span>
                     <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-gray-100 rounded">
                         <ChevronRight size={20} />
                     </button>
                 </div>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {/* Weekday Headers */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', color: '#6b7280' }}>
-                    {weekDays.map(day => (
-                        <div key={day} style={{ padding: '0.5rem 0.5rem', textAlign: 'right', fontWeight: 500, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+            {/* Calendar Grid - Reference Style - Forced Grid with Inline Styles */}
+            <div style={{ background: 'white', border: '2px solid #fecaca' }}>
+                {/* Headers */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    borderBottom: '2px solid #fecaca'
+                }}>
+                    {weekDays.map((day, idx) => (
+                        <div key={day} style={{
+                            padding: '1rem',
+                            textAlign: 'center',
+                            fontWeight: 'bold',
+                            color: '#ef4444',
+                            borderRight: idx < 6 ? '1px solid #fee2e2' : 'none'
+                        }}>
                             {day}
                         </div>
                     ))}
                 </div>
 
-                {/* Days - Force Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                {/* Days - Forced Grid */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(7, 1fr)',
+                    background: 'white'
+                }}>
                     {calendarDays.map((day, idx) => {
                         const dateKey = day.toISOString();
                         const isCurrentMonth = isSameMonth(day, currentMonth);
                         const isToday = isSameDay(day, new Date());
-                        const dayIndents = indents.filter(i => isSameDay(new Date(i.startTime), day));
-                        const rosterValue = getRosterValue(day);
+                        const value = getRosterValue(day);
+
+                        // Calculate borders based on 7-col grid
+                        // Right border for all except last in row (col 7, 14, 21...)
+                        // Bottom border for all rows
+                        const isLastInRow = (idx + 1) % 7 === 0;
+                        const borderRight = isLastInRow ? 'none' : '1px solid #fee2e2';
+                        const borderBottom = '1px solid #fee2e2';
 
                         return (
                             <div
                                 key={dateKey}
-                                className={`
-                                    min-h-[140px] border-b border-r bg-white p-1 flex flex-col gap-1 transition-colors relative
-                                    ${!isCurrentMonth ? 'bg-gray-50/50 text-gray-300' : ''}
-                                    ${idx % 7 === 6 ? 'border-r-0' : ''}
-                                `}
+                                style={{
+                                    minHeight: '150px',
+                                    borderRight,
+                                    borderBottom,
+                                    padding: '0.5rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    background: isCurrentMonth ? 'white' : '#f9fafb',
+                                    position: 'relative'
+                                }}
                             >
-                                {/* Date Header */}
-                                <div className="flex justify-end p-1">
-                                    <span className={`
-                                        text-xs font-semibold h-6 w-6 flex items-center justify-center rounded-full
-                                        ${isToday ? 'bg-red-500 text-white' : (isCurrentMonth ? 'text-gray-700' : 'text-gray-400')}
-                                    `}>
-                                        {format(day, 'd')}
-                                        {format(day, 'd') === '1' && <span className="ml-1 hidden md:inline">{format(day, 'MMM')}</span>}
-                                    </span>
+                                {/* Date Number */}
+                                <div style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: 'bold',
+                                    marginBottom: '0.5rem',
+                                    color: isToday ? '#2563eb' : (isCurrentMonth ? '#ef4444' : '#fca5a5')
+                                }}>
+                                    {format(day, 'd')}
                                 </div>
 
-                                {/* Duty Personnel (Red 'Header' Event) */}
-                                {isMTC ? (
-                                    <div className="mb-1 flex gap-1 items-center">
-                                        <input
-                                            type="text"
-                                            className="flex-1 min-w-0 text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 font-semibold border-l-2 border-red-500 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-400 placeholder:text-red-300 truncate"
-                                            placeholder="Duty Person..."
-                                            value={rosterValue}
+                                {/* Content Input Area */}
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                    {isMTC ? (
+                                        <textarea
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                resize: 'none',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                fontSize: '0.875rem',
+                                                fontWeight: 500,
+                                                color: '#1f2937',
+                                                fontFamily: 'inherit',
+                                                outline: 'none',
+                                                padding: '2px'
+                                            }}
+                                            placeholder="Duty Person"
+                                            value={value}
                                             onChange={(e) => handleRosterChange(dateKey, e.target.value)}
-                                            onBlur={(e) => saveRosterEntry(day, e.target.value)}
                                         />
-                                        <button
-                                            onClick={() => saveRosterEntry(day, rosterValue)}
-                                            className="p-0.5 text-red-600 hover:bg-red-50 rounded"
-                                            title="Save Duty Personnel"
-                                        >
-                                            <Save size={12} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    rosterValue && (
-                                        <div className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 font-semibold border-l-2 border-red-500 truncate mb-1" title="Duty Personnel">
-                                            {rosterValue}
+                                    ) : (
+                                        <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#1f2937', whiteSpace: 'pre-wrap' }}>
+                                            {value}
                                         </div>
-                                    )
-                                )}
-
-                                {/* Indents Hidden as requested by user ("not show any of the indents") */}
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
 
-            <div className="mt-4 text-xs text-gray-500 flex justify-end gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-600 rounded-sm"></div>
-                    <span>Header (Calendar)</span>
+            {/* Floating Save Button */}
+            {isMTC && (
+                <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 transition-all duration-300 ${hasUnsavedChanges ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                    <button
+                        onClick={handleSaveAll}
+                        disabled={isSaving}
+                        className="btn shadow-xl pl-6 pr-8 py-3 rounded-full flex items-center gap-3 text-white font-bold text-lg hover:scale-105 transition-transform"
+                        style={{ background: '#dc2626' }}
+                    >
+                        {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                        Save Schedule Changes
+                    </button>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                    <span>Today</span>
-                </div>
-            </div>
+            )}
         </div>
     );
 }

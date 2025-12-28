@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import {
     getVehicleConfigs, toggleVehicle, addVehicle,
     getLocationConfigs, toggleLocation, addLocation,
-    getRPLSchedule, toggleRPL, addRPLTime,
+    getRPLSchedule, deleteRPL, addRPLTime,
     getSystemSettings, updateSystemSetting
 } from '@/app/actions/config';
 import { seedInitialConfig } from '@/app/actions/seed';
-import { Settings, Truck, MapPin, Clock, Plus, Power, Save, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Settings, Truck, MapPin, Clock, Plus, Power, Save, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react';
 
 export default function AdminConfigPage() {
     const [activeTab, setActiveTab] = useState<'GENERAL' | 'VEHICLES' | 'LOCATIONS' | 'RPL'>('GENERAL');
@@ -41,10 +41,15 @@ export default function AdminConfigPage() {
     }, [refreshKey]);
 
     // Handlers
-    const handleToggleInfo = async (type: 'VEHICLE' | 'LOCATION' | 'RPL', id: string, current: boolean) => {
+    const handleToggleInfo = async (type: 'VEHICLE' | 'LOCATION', id: string, current: boolean) => {
         if (type === 'VEHICLE') await toggleVehicle(id, !current);
         if (type === 'LOCATION') await toggleLocation(id, !current);
-        if (type === 'RPL') await toggleRPL(id, !current);
+        refresh();
+    };
+
+    const handleDeleteRPL = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this timing?")) return;
+        await deleteRPL(id);
         refresh();
     };
 
@@ -261,7 +266,13 @@ export default function AdminConfigPage() {
                                     {rpl.filter(r => r.type === 'ARRIVE').map(r => (
                                         <div key={r.id} className="flex justify-between items-center p-3 border rounded bg-card">
                                             <span className="font-mono">{r.time}</span>
-                                            <button onClick={() => handleToggleInfo('RPL', r.id, r.isActive)} className={`btn btn-sm btn-ghost ${r.isActive ? 'text-green-600' : 'text-muted-foreground'}`}><Power size={16} /></button>
+                                            <button
+                                                onClick={() => handleDeleteRPL(r.id)}
+                                                className="btn btn-sm btn-ghost text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                                title="Delete Timing"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
@@ -272,7 +283,13 @@ export default function AdminConfigPage() {
                                     {rpl.filter(r => r.type === 'DEPART').map(r => (
                                         <div key={r.id} className="flex justify-between items-center p-3 border rounded bg-card">
                                             <span className="font-mono">{r.time}</span>
-                                            <button onClick={() => handleToggleInfo('RPL', r.id, r.isActive)} className={`btn btn-sm btn-ghost ${r.isActive ? 'text-green-600' : 'text-muted-foreground'}`}><Power size={16} /></button>
+                                            <button
+                                                onClick={() => handleDeleteRPL(r.id)}
+                                                className="btn btn-sm btn-ghost text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                                title="Delete Timing"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     ))}
                                 </div>

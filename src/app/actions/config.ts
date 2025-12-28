@@ -140,3 +140,15 @@ export async function toggleRPL(id: string, isActive: boolean) {
         return { success: false, error: 'Failed to toggle RPL' };
     }
 }
+
+export async function deleteRPL(id: string) {
+    try {
+        await prisma.rPLSchedule.delete({
+            where: { id }
+        });
+        revalidatePath('/dashboard/admin/config');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: 'Failed to delete RPL time' };
+    }
+}

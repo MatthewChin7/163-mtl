@@ -200,7 +200,7 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                                                 checked={actionState[indent.id]?.isQualified || false}
                                                 onChange={(e) => updateActionState(indent.id, 'isQualified', e.target.checked)}
                                             />
-                                            <label htmlFor={`qual-${indent.id}`} className="text-xs text-gray-600 leading-tight">
+                                            <label htmlFor={`qual-${indent.id}`} className="text-xs font-bold leading-tight" style={{ color: '#000000' }}>
                                                 I confirm that the assigned Transport Operator is fully qualified to drive the requested vehicle: <strong>{indent.vehicleType}</strong>
                                             </label>
                                         </div>
@@ -214,7 +214,7 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                                         </label>
                                         <input
                                             className="input"
-                                            style={{ background: '#fff' }}
+                                            style={{ background: '#fff', color: '#000000', fontWeight: 500 }}
                                             placeholder="Optional for Approve, Required for Reject"
                                             value={actionState[indent.id]?.reason || ''}
                                             onChange={(e) => updateActionState(indent.id, 'reason', e.target.value)}
@@ -246,23 +246,40 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                         {/* MTC Post-Approval Edit (Edit TO Name) */}
                         {indent.status === 'APPROVED' && user.role === 'APPROVER_MTC' && (
                             <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', marginTop: '0.5rem', border: '1px dashed #cbd5e1' }}>
-                                <div className="flex items-end gap-2">
+                                <div className="flex flex-col gap-3">
                                     <div className="flex-1">
-                                        <label className="text-xs font-bold text-gray-700 uppercase mb-1 block">Update Transport Operator</label>
+                                        <label className="text-xs font-bold uppercase mb-1 block" style={{ color: '#000000' }}>Update Transport Operator</label>
                                         <input
                                             type="text"
                                             className="input input-sm border-gray-300 w-full"
                                             placeholder="Rank & Name of Driver"
-                                            // Prefer state value, fallback to indent's existing value
                                             value={actionState[indent.id]?.toName ?? indent.transportOperator ?? ''}
                                             onChange={(e) => updateActionState(indent.id, 'toName', e.target.value)}
                                         />
                                     </div>
+                                    <div className="flex items-start gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id={`qual-update-${indent.id}`}
+                                            className="mt-1"
+                                            checked={actionState[indent.id]?.isQualified || false}
+                                            onChange={(e) => updateActionState(indent.id, 'isQualified', e.target.checked)}
+                                        />
+                                        <label htmlFor={`qual-update-${indent.id}`} className="text-xs font-bold leading-tight" style={{ color: '#000000' }}>
+                                            I confirm that this NEW Transport Operator is fully qualified to drive the requested vehicle: <strong>{indent.vehicleType}</strong>
+                                        </label>
+                                    </div>
                                     <button
-                                        className="btn btn-sm bg-blue-600 text-white hover:bg-blue-700"
+                                        className="btn btn-sm bg-blue-600 text-white hover:bg-blue-700 w-full"
                                         onClick={async () => {
                                             const newName = actionState[indent.id]?.toName ?? indent.transportOperator;
                                             if (!newName?.trim()) return alert("Name cannot be empty");
+
+                                            // Validate Qualification Checkbox
+                                            if (!actionState[indent.id]?.isQualified) {
+                                                alert("You must confirm the driver's qualification updates.");
+                                                return;
+                                            }
 
                                             updateActionState(indent.id, 'loading', true);
                                             // Import this! I will replace import line separately.
@@ -272,6 +289,8 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                                             if (res.success) {
                                                 refreshData();
                                                 alert("Transport Operator Updated");
+                                                // Reset qual check?
+                                                updateActionState(indent.id, 'isQualified', false);
                                             } else {
                                                 alert("Update failed");
                                             }
@@ -279,7 +298,7 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                                         }}
                                         disabled={isLoading}
                                     >
-                                        Update TO
+                                        Update TO & Confirm Qualification
                                     </button>
                                 </div>
                             </div>

@@ -17,12 +17,26 @@ export default function IndentDetailsModal({ indent, onClose }: IndentDetailsMod
         }}>
             <div className="glass-panel" style={{ width: '90%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto', padding: '0', position: 'relative', background: '#fff' }}>
                 {/* Header */}
-                <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
+                <div style={{
+                    padding: '1.5rem',
+                    borderBottom: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    background: indent.status === 'REJECTED' ? '#000000' : '#ffffff',
+                    color: indent.status === 'REJECTED' ? '#ffffff' : '#000000'
+                }}>
                     <div>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Indent #{indent.serialNumber} Details</h2>
-                        <span className={`status-badge status-${indent.status.toLowerCase()}`}>{indent.status.replace('_', ' ')}</span>
+                        <span className={`status-badge status-${indent.status.toLowerCase()}`} style={{ border: indent.status === 'REJECTED' ? '1px solid white' : 'none' }}>
+                            {indent.status.replace('_', ' ')}
+                        </span>
+                        {indent.status === 'REJECTED' && <span style={{ marginLeft: '1rem', fontWeight: 700, color: '#ef4444' }}>REJECTED</span>}
                     </div>
-                    <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.5rem' }}>
+                    <button onClick={onClose} className="btn btn-ghost" style={{ padding: '0.5rem', color: indent.status === 'REJECTED' ? 'white' : 'inherit' }}>
                         <X size={24} />
                     </button>
                 </div>
