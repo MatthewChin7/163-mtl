@@ -6,6 +6,7 @@ import { Indent, VehicleType, UserRole, LocationCategory, InCampLocation, OutCam
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/store';
 import { ArrowLeft, ArrowRight, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { createIndent, updateIndent } from '@/app/actions/indents';
 
 interface IndentFormProps {
     initialData?: Indent;
@@ -71,7 +72,7 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
     const endIsME = formData.endLocation === 'ME';
     const showRPLInput = (startIsME || endIsME) && !(startIsME && endIsME);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
@@ -117,88 +118,71 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
             return;
         }
 
-        // Serial Generation (Mock)
-        const serial = `${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        // Server Action Migration
+        try {
+            if (isEditing && initialData) {
+                // Formatting payload for update
+                const payload = {
+                    ...formData,
+                    waypoints: formData.waypoints || [],
+                };
+                // We don't generate ID/Serial here.
+                const res = await updateIndent(initialData.id, payload);
+                if (!res.success) {
+                    setError("Update failed: " + res.error);
+                    return;
+                }
+            } else {
+                // Validation for required fields that might be Partial
+                if (!formData.vehicleType || !formData.typeOfIndent) {
+                    setError("System Error: Default values missing");
+                    return;
+                }
 
-        const newIndent: Indent = {
-            id: crypto.randomUUID(),
-            serialNumber: serial,
-            requestorId: user?.id || 'unknown',
-            createdAt: new Date().toISOString(),
-            status: 'PENDING_AS3', // Initial State
-            approvalLogs: [],
+                // Create Payload
+                // Note: user.id is passed separately to createIndent as per our action signature
+                const payload = {
+                    ...formData,
+                    waypoints: formData.waypoints || [],
+                    vehicleType: formData.vehicleType,
+                    typeOfIndent: formData.typeOfIndent,
+                    startLocationCategory: formData.startLocationCategory,
+                    startLocation: formData.startLocation,
+                    endLocationCategory: formData.endLocationCategory,
+                    endLocation: formData.endLocation,
+                    purpose: formData.purpose,
+                    startTime: formData.startTime,
+                    endTime: formData.endTime,
+                    vehicleCommanderName: formData.vehicleCommanderName,
+                    reason: formData.reason,
+                    transportOperator: formData.transportOperator,
+                    // Optional
+                    vehicleNumber: formData.vehicleNumber,
+                    equipmentNumber: formData.equipmentNumber,
+                    specialInstructions: formData.specialInstructions,
+                    parkingLotNumber: formData.parkingLotNumber,
+                    rplTiming: formData.rplTiming,
+                    rplTimingDepart: formData.rplTimingDepart,
+                    rplTimingArrive: formData.rplTimingArrive,
+                    vehicleTypeOther: formData.vehicleTypeOther,
+                    startLocationOther: formData.startLocationOther,
+                    endLocationOther: formData.endLocationOther,
+                };
 
-            // Cast the partial to full type after validation
-            vehicleType: formData.vehicleType as VehicleType,
-            vehicleTypeOther: formData.vehicleTypeOther,
-            vehicleNumber: formData.vehicleNumber,
-
-            startTime: formData.startTime,
-            endTime: formData.endTime,
-
-            startLocationCategory: formData.startLocationCategory as LocationCategory,
-            startLocation: formData.startLocation!,
-            startLocationOther: formData.startLocationOther,
-
-            endLocationCategory: formData.endLocationCategory as LocationCategory,
-            endLocation: formData.endLocation!,
-            endLocationOther: formData.endLocationOther,
-
-            parkingLotNumber: formData.parkingLotNumber,
-            rplTiming: formData.rplTiming,
-
-            purpose: formData.purpose!,
-            typeOfIndent: formData.typeOfIndent as any,
-            vehicleCommanderName: formData.vehicleCommanderName!,
-            transportOperator: formData.transportOperator,
-            reason: formData.reason!,
-            specialInstructions: formData.specialInstructions,
-
-            // New Fields for Clean Type
-            approverSkipList: [],
-            editorRoleId: undefined
-        };
-
-        if (isEditing && initialData) {
-            // Re-approval Logic
-            let newStatus = initialData.status;
-
-            if (user?.role === 'REQUESTOR') {
-                // Check if only vehicleCommanderName changed
-                const significantChanges = (
-                    formData.startTime !== initialData.startTime ||
-                    formData.endTime !== initialData.endTime ||
-                    formData.startLocation !== initialData.startLocation ||
-                    formData.endLocation !== initialData.endLocation ||
-                    formData.vehicleType !== initialData.vehicleType ||
-                    formData.purpose !== initialData.purpose ||
-                    formData.typeOfIndent !== initialData.typeOfIndent ||
-                    formData.rplTiming !== initialData.rplTiming ||
-                    formData.parkingLotNumber !== initialData.parkingLotNumber
-                );
-
-                if (significantChanges) {
-                    newStatus = 'PENDING_AS3'; // Reset workflow
+                const res = await createIndent(payload, user?.id || 'unknown');
+                if (!res.success) {
+                    setError("Submission failed: " + res.error);
+                    return;
                 }
             }
 
-            // Update Flow
-            db.indents.update(initialData.id, {
-                ...newIndent,
-                id: initialData.id,
-                serialNumber: initialData.serialNumber,
-                createdAt: initialData.createdAt,
-                status: newStatus,
-                approvalLogs: newStatus === 'PENDING_AS3' ? [] : initialData.approvalLogs, // Clear logs if reset
-                editorRoleId: user?.role
-            });
-        } else {
-            // Create Flow
-            db.indents.add(newIndent);
+            // Redirect
+            router.push('/dashboard');
+            router.refresh(); // Ensure dashboard updates
+        } catch (e) {
+            setError("An unexpected error occurred.");
+            console.error(e);
         }
-
-        // Redirect
-        router.push('/dashboard');
     };
 
     const handleChange = (field: keyof Indent, value: any) => {

@@ -335,20 +335,22 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                     <button className="text-xs opacity-60" onClick={() => setEditingUserId(null)}>Cancel</button>
                                                 </div>
                                             ) : (
-                                                <button
-                                                    className="opacity-50 hover:opacity-100"
-                                                    onClick={() => { setEditingUserId(u.id); setTempRole(u.role); }}
-                                                    title="Edit Role"
-                                                >
-                                                    <Edit size={16} />
-                                                </button>
-                                                <button
-                                                    className="opacity-50 hover:opacity-100 hover:text-red-600 ml-2"
-                                                    onClick={() => handleDeleteUser(u.id)}
-                                                    title="Delete User"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        className="opacity-50 hover:opacity-100"
+                                                        onClick={() => { setEditingUserId(u.id); setTempRole(u.role); }}
+                                                        title="Edit Role"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="opacity-50 hover:opacity-100 hover:text-red-600 ml-2"
+                                                        onClick={() => handleDeleteUser(u.id)}
+                                                        title="Delete User"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </>
                                             )
                                         )}
                                     </td>

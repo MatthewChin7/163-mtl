@@ -30,7 +30,7 @@ export default function DashboardPage() {
             ? allIndents.filter((i: any) => i.requestorId === user.id)
             : allIndents;
 
-        setIndents(filtered as Indent[]);
+        setIndents(filtered as unknown as Indent[]);
         setLoading(false);
     };
 

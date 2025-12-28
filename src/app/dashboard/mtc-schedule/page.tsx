@@ -18,7 +18,7 @@ export default function MtcSchedulePage() {
 
     const loadIndents = async () => {
         const data = await getIndents();
-        setIndents(data as Indent[]);
+        setIndents(data as unknown as Indent[]);
     };
 
     // View State: Next 7 days
@@ -82,8 +82,8 @@ export default function MtcSchedulePage() {
                                             </div>
                                             <div className="text-right text-xs">
                                                 <div className={`font-bold ${indent.status === 'APPROVED' ? 'text-green-600' :
-                                                        indent.status === 'REJECTED' ? 'text-red-600' :
-                                                            'text-yellow-600'
+                                                    indent.status === 'REJECTED' ? 'text-red-600' :
+                                                        'text-yellow-600'
                                                     }`}>{indent.status}</div>
                                                 <div className="text-gray-400">#{indent.serialNumber}</div>
                                             </div>

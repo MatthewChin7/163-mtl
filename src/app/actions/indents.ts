@@ -96,3 +96,28 @@ export async function updateIndentStatus(indentId: string, status: IndentStatus,
         return { success: false, error: 'Update Failed' };
     }
 }
+
+export async function updateIndent(indentId: string, data: any) {
+    try {
+        const { waypoints, ...rest } = data;
+
+        // Exclude fields that shouldn't be updated directly or handled separately
+        // e.g. serialNumber, createdAt, requestorId
+        const { serialNumber, createdAt, requestorId, id, ...updateData } = rest;
+
+        await prisma.indent.update({
+            where: { id: indentId },
+            data: {
+                ...updateData,
+                startTime: new Date(updateData.startTime),
+                endTime: new Date(updateData.endTime),
+                waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [],
+            }
+        });
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update indent:', error);
+        return { success: false, error: 'Update Failed' };
+    }
+}

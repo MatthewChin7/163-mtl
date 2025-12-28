@@ -27,9 +27,9 @@ export default function ProfilePage() {
         if (session?.user) {
             setFormData(prev => ({
                 ...prev,
-                name: session.user.name || '',
+                name: session.user?.name || '',
                 rank: (session.user as any).rank || '',
-                email: session.user.email || '',
+                email: session.user?.email || '',
                 unit: (session.user as any).unit || '',
             }));
             // Initialize desired role different from current?
