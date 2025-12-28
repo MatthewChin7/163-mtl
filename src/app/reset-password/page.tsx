@@ -1,27 +1,46 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { requestPasswordReset } from '@/app/actions/auth-reset';
-import { Mail, ArrowLeft } from 'lucide-react';
+import { resetPassword } from '@/app/actions/auth-reset';
+import { KeyRound, ArrowLeft } from 'lucide-react';
 
-export default function ForgotPasswordPage() {
-    const [email, setEmail] = useState('');
+export default function ResetPasswordPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const token = searchParams.get('token');
+
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
     const [errorMessage, setErrorMessage] = useState('');
 
+    useEffect(() => {
+        if (!token) {
+            setStatus('ERROR');
+            setErrorMessage('Missing or invalid token.');
+        }
+    }, [token]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (password !== confirmPassword) {
+            setErrorMessage('Passwords do not match.');
+            return;
+        }
+        if (!token) return;
+
         setStatus('LOADING');
         setErrorMessage('');
 
-        const res = await requestPasswordReset(email);
+        const res = await resetPassword(token, password);
 
         if (res.success) {
             setStatus('SUCCESS');
         } else {
             setStatus('ERROR');
-            setErrorMessage(res.error || 'Something went wrong.');
+            setErrorMessage(res.error || 'Failed to reset password.');
         }
     };
 
@@ -41,20 +60,18 @@ export default function ForgotPasswordPage() {
                         borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         margin: '0 auto 1rem auto', color: 'var(--primary)'
                     }}>
-                        <Mail size={24} />
+                        <KeyRound size={24} />
                     </div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Forgot Password?</h1>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Set New Password</h1>
                     <p style={{ color: 'var(--fg-secondary)', fontSize: '0.875rem' }}>
-                        No worries, we'll send you reset instructions.
+                        Must be at least 6 characters.
                     </p>
                 </div>
 
                 {status === 'SUCCESS' ? (
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ padding: '1rem', background: '#ecfdf5', color: '#047857', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-                            Currently email sending is not configured in this dev environment.
-                            <br /><br />
-                            <strong>Check console logs for the reset link!</strong>
+                            Password reset successfully!
                         </div>
                         <Link href="/login" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
                             Back to Login
@@ -63,15 +80,29 @@ export default function ForgotPasswordPage() {
                 ) : (
                     <form onSubmit={handleSubmit}>
                         <div className="form-group mb-4">
-                            <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Email Address</label>
+                            <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">New Password</label>
                             <input
-                                type="email"
+                                type="password"
                                 className="input w-full"
-                                placeholder="Enter your email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 required
-                                disabled={status === 'LOADING'}
+                                minLength={6}
+                                disabled={status === 'LOADING' || !token}
+                            />
+                        </div>
+                        <div className="form-group mb-4">
+                            <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Confirm Password</label>
+                            <input
+                                type="password"
+                                className="input w-full"
+                                placeholder="••••••••"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                                minLength={6}
+                                disabled={status === 'LOADING' || !token}
                             />
                         </div>
 
@@ -84,9 +115,9 @@ export default function ForgotPasswordPage() {
                         <button
                             type="submit"
                             className="btn btn-primary w-full justify-center mb-4"
-                            disabled={status === 'LOADING'}
+                            disabled={status === 'LOADING' || !token}
                         >
-                            {status === 'LOADING' ? 'Sending...' : 'Reset Password'}
+                            {status === 'LOADING' ? 'Resetting...' : 'Reset Password'}
                         </button>
 
                         <div className="text-center">

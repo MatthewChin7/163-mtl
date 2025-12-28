@@ -76,12 +76,12 @@ export interface Indent {
     // Approval Flow & Rejection
     approvalLogs: ApprovalLog[];
     cancellationReason?: string;
-    editorRoleId?: UserRole; // Track who made the last edit (for re-approval loops)
+    editorRole?: UserRole; // Track who made the last edit (for re-approval loops)
     approverSkipList?: UserRole[]; // Roles that have already approved and should be skipped in re-approval
 
     // Core Data
-    vehicleType: VehicleType;
-    vehicleTypeOther?: string;
+    vehicleType: string; // Dynamic via Config
+    vehicleTypeOther: string | null;
     vehicleNumber?: string;
     equipmentNumber?: string;
 
@@ -113,6 +113,9 @@ export interface Indent {
     reason?: string;
     specialInstructions?: string;
     previousStatus?: IndentStatus; // To restore context if needed
+
+    // Relations (Populated via include: { ... })
+    requestor?: User;
 }
 
 export interface RoleRequest {
@@ -129,3 +132,6 @@ export interface DailyDutyDO {
     date: string; // ISO Date "yyyy-mm-dd"
     rankName: string; // e.g. "LCP Tan"
 }
+// ... existing types
+
+

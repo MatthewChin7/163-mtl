@@ -1,10 +1,11 @@
 'use client';
 
 import { Indent, User } from '@/types';
-import { db } from '@/lib/store';
+// import { db } from '@/lib/store'; // Mock DB removed
 import { useState } from 'react';
 import { Check, CheckSquare, Square } from 'lucide-react';
 import { format } from 'date-fns';
+import { updateIndentStatus } from '@/app/actions/indents';
 
 interface MonthlyIndentListProps {
     indents: Indent[];
@@ -25,6 +26,7 @@ export default function MonthlyIndentList({ indents, user, refreshData }: Monthl
     });
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSelectAll = () => {
         if (selectedIds.length === approvableIndents.length) {
@@ -42,38 +44,35 @@ export default function MonthlyIndentList({ indents, user, refreshData }: Monthl
         }
     };
 
-    const handleBulkApprove = () => {
+    const handleBulkApprove = async () => {
         if (!confirm(`Approve ${selectedIds.length} indents?`)) return;
+        setIsSubmitting(true);
 
-        selectedIds.forEach(id => {
-            const indent = db.indents.getById(id);
-            if (!indent) return;
+        try {
+            await Promise.all(selectedIds.map(async (id) => {
+                const indent = indents.find(i => i.id === id); // Find in props
+                if (!indent) return;
 
-            let nextStatus = indent.status;
-            // Monthly indents typically follow normal flow? Or special? Assuming normal flow.
-            if (user.role === 'APPROVER_AS3') nextStatus = 'PENDING_S3';
-            else if (user.role === 'APPROVER_S3') nextStatus = 'PENDING_MTC';
-            else if (user.role === 'APPROVER_MTC') nextStatus = 'APPROVED';
+                let nextStatus: any = indent.status;
+                // Monthly indents typically follow normal flow
+                if (user.role === 'APPROVER_AS3') nextStatus = 'PENDING_S3';
+                else if (user.role === 'APPROVER_S3') nextStatus = 'PENDING_MTC';
+                else if (user.role === 'APPROVER_MTC') nextStatus = 'APPROVED';
 
-            db.indents.update(id, {
-                status: nextStatus,
-                approvalLogs: [
-                    ...indent.approvalLogs,
-                    {
-                        stage: user.role,
-                        status: 'APPROVED',
-                        timestamp: new Date().toISOString(),
-                        approverId: user.id,
-                        approverName: user.name,
-                        reason: 'Bulk Approval'
-                    }
-                ]
-            });
-        });
+                // Call Server Action
+                // Note: updateIndentStatus arguments: (indentId, status, approverId, reason, transportOperatorName)
+                await updateIndentStatus(id, nextStatus, user.id, 'Bulk Approval');
+            }));
 
-        setSelectedIds([]);
-        refreshData();
-        alert('Bulk approval complete.');
+            setSelectedIds([]);
+            refreshData();
+            alert('Bulk approval complete.');
+        } catch (error) {
+            console.error("Bulk approval failed", error);
+            alert("Some indents failed to update.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (approvableIndents.length === 0) {

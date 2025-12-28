@@ -2,58 +2,76 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/store';
+// import { db } from '@/lib/store'; // Removed mock store
+import { getIndents } from '@/app/actions/indents'; // Import Server Action
 import { Indent } from '@/types';
-import { auth } from '@/lib/auth';
+// import { auth } from '@/lib/auth'; // Migrating to useSession
+import { useSession } from 'next-auth/react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { format, startOfWeek, addDays, startOfDay, endOfDay, isWithinInterval, parseISO, endOfWeek } from 'date-fns';
 import { exportIndentsToExcel } from '@/lib/excel';
 
 export default function SchedulePage() {
     const router = useRouter();
+    const { data: session } = useSession();
     const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
         start: startOfWeek(new Date(), { weekStartsOn: 1 }),
         end: endOfWeek(new Date(), { weekStartsOn: 1 }),
     });
     const [indents, setIndents] = useState<Indent[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Filters
     const [locationFilter, setLocationFilter] = useState('');
     const [vehicleTypeFilter, setVehicleTypeFilter] = useState('ALL');
     const [showOnlyMyIndents, setShowOnlyMyIndents] = useState(false);
-    const user = auth.getCurrentUser();
+
+    // Derived user from session
+    const user = session?.user;
 
     // Modal State
     const [selectedIndent, setSelectedIndent] = useState<Indent | null>(null);
 
     useEffect(() => {
-        const allIndents = db.indents.getAll();
-        // Filter by date range (overlap logic)
-        const visibleParams = allIndents.filter(i => {
-            const iStart = new Date(i.startTime);
-            const iEnd = new Date(i.endTime);
-            return iStart <= dateRange.end && iEnd >= dateRange.start;
-        });
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const allIndents = await getIndents() as unknown as Indent[];
 
-        let filtered = visibleParams;
-        if (locationFilter) {
-            const search = locationFilter.toLowerCase();
-            filtered = filtered.filter(i =>
-                i.startLocation.toLowerCase().includes(search) ||
-                i.endLocation.toLowerCase().includes(search) ||
-                (i.waypoints || []).some(w => w.location.toLowerCase().includes(search))
-            );
-        }
-        if (vehicleTypeFilter !== 'ALL') {
-            filtered = filtered.filter(i => i.vehicleType === vehicleTypeFilter);
-        }
-        if (showOnlyMyIndents && user) {
-            filtered = filtered.filter(i => i.requestorId === user.id);
-        }
+                // Filter by date range (overlap logic)
+                const visibleParams = allIndents.filter((i: Indent) => {
+                    const iStart = new Date(i.startTime);
+                    const iEnd = new Date(i.endTime);
+                    return iStart <= dateRange.end && iEnd >= dateRange.start;
+                });
 
-        // Sort by start time
-        filtered.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-        setIndents(filtered);
+                let filtered = visibleParams;
+                if (locationFilter) {
+                    const search = locationFilter.toLowerCase();
+                    filtered = filtered.filter((i: Indent) =>
+                        i.startLocation.toLowerCase().includes(search) ||
+                        i.endLocation.toLowerCase().includes(search) ||
+                        (i.waypoints || []).some((w: any) => w.location.toLowerCase().includes(search))
+                    );
+                }
+                if (vehicleTypeFilter !== 'ALL') {
+                    filtered = filtered.filter((i: Indent) => i.vehicleType === vehicleTypeFilter);
+                }
+                if (showOnlyMyIndents && user) {
+                    filtered = filtered.filter((i: Indent) => i.requestorId === user.id);
+                }
+
+                // Sort by start time
+                filtered.sort((a: Indent, b: Indent) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                setIndents(filtered);
+            } catch (error) {
+                console.error("Failed to load schedule:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
     }, [dateRange, locationFilter, vehicleTypeFilter, showOnlyMyIndents, user]);
 
     const handlePreviousWeek = () => {
@@ -77,8 +95,32 @@ export default function SchedulePage() {
         return route.join(' → ');
     };
 
+
+    // Helper to generate days
+    const getDaysArray = (start: Date, end: Date) => {
+        const arr = [];
+        let dt = new Date(start);
+        while (dt <= end) {
+            arr.push(new Date(dt));
+            dt = addDays(dt, 1);
+        }
+        return arr;
+    };
+
+    const days = getDaysArray(dateRange.start, dateRange.end);
+
+    // Helper to check overlap
+    const isOverlapping = (indent: Indent, day: Date) => {
+        const dayStart = startOfDay(day);
+        const dayEnd = endOfDay(day);
+        const iStart = new Date(indent.startTime);
+        const iEnd = new Date(indent.endTime);
+        return iStart <= dayEnd && iEnd >= dayStart;
+    };
+
     return (
         <div style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: '3rem' }}>
+            {/* Header Controls (Keep existing) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
                     <h1 style={{ fontSize: '1.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -87,7 +129,6 @@ export default function SchedulePage() {
                     <p style={{ color: 'var(--fg-secondary)' }}>Overview of all transport movements.</p>
                 </div>
 
-                {/* Controls */}
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     <div className="glass-panel" style={{ padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Search size={16} style={{ color: 'var(--fg-secondary)' }} />
@@ -109,72 +150,94 @@ export default function SchedulePage() {
                 </div>
             </div>
 
-            {/* Schedule Table */}
-            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                    <thead>
-                        <tr style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--fg-secondary)' }}>
-                            <th style={{ padding: '0.75rem 1rem', width: '120px' }}>Date</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '100px' }}>Time</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '100px' }}>Type</th>
-                            <th style={{ padding: '0.75rem 1rem' }}>Route</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '150px' }}>Purpose</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '120px' }}>Vehicle</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '150px' }}>Driver (TO)</th>
-                            <th style={{ padding: '0.75rem 1rem', width: '100px' }}>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {indents.length === 0 ? (
-                            <tr>
-                                <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--fg-secondary)' }}>
-                                    No movements found for this period.
-                                </td>
-                            </tr>
-                        ) : (
-                            indents.map((indent) => (
-                                <tr
-                                    key={indent.id}
-                                    style={{ borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.2s' }}
-                                    className="hover:bg-black/5"
-                                    onClick={() => setSelectedIndent(indent)}
-                                >
-                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>{format(new Date(indent.startTime), 'dd MMM (EEE)')}</td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        {format(new Date(indent.startTime), 'HHmm')} - {format(new Date(indent.endTime), 'HHmm')}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        <span style={{
-                                            padding: '0.2rem 0.5rem',
-                                            borderRadius: '999px',
-                                            fontSize: '0.7rem',
-                                            fontWeight: 600,
-                                            background: indent.typeOfIndent === 'INCAMP_TO' ? '#dbeafe' : '#f3f4f6',
-                                            color: indent.typeOfIndent === 'INCAMP_TO' ? '#1e40af' : '#374151'
-                                        }}>
-                                            {indent.typeOfIndent.replace('_', ' ')}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
-                                        {formatRoute(indent)}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--fg-secondary)' }}>{indent.purpose}</td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>{indent.vehicleType}</td>
-                                    <td style={{ padding: '0.75rem 1rem', color: indent.transportOperator ? 'var(--fg-primary)' : 'var(--fg-tertiary)' }}>
-                                        {indent.transportOperator || 'TBC'}
-                                    </td>
-                                    <td style={{ padding: '0.75rem 1rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}>
-                                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: indent.status === 'APPROVED' ? '#10b981' : indent.status === 'REJECTED' ? '#ef4444' : '#f59e0b' }} />
-                                            {indent.status}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+            {/* Daily Groups */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {days.map((day) => {
+                    // Find indents for this day
+                    const dayIndents = indents.filter(i => isOverlapping(i, day));
+
+                    return (
+                        <div key={day.toISOString()}>
+                            {/* Date Header */}
+                            <h3 style={{
+                                fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem',
+                                color: 'var(--fg-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                            }}>
+                                {format(day, 'd MMM (EEEE)')}
+                                <span style={{ fontSize: '0.9rem', color: 'var(--fg-tertiary)', fontWeight: 500 }}>
+                                    {dayIndents.length} movements
+                                </span>
+                            </h3>
+
+                            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--bg-panel)', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--fg-secondary)' }}>
+                                            <th style={{ padding: '0.75rem 1rem', width: '220px' }}>Execution Time</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '100px' }}>Type</th>
+                                            <th style={{ padding: '0.75rem 1rem' }}>Route</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '150px' }}>Purpose</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '120px' }}>Vehicle</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '150px' }}>Driver (TO)</th>
+                                            <th style={{ padding: '0.75rem 1rem', width: '100px' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dayIndents.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--fg-tertiary)', fontStyle: 'italic' }}>
+                                                    No movements scheduled.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            dayIndents.map((indent) => (
+                                                <tr
+                                                    key={`${indent.id}-${day.toISOString()}`}
+                                                    style={{ borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer', transition: 'background 0.2s' }}
+                                                    className="hover:bg-black/5"
+                                                    onClick={() => setSelectedIndent(indent)}
+                                                >
+                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500, whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                                        {format(new Date(indent.startTime), 'dd MMM HH:mm')} - <br />
+                                                        {format(new Date(indent.endTime), 'dd MMM HH:mm')}
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem' }}>
+                                                        <span style={{
+                                                            padding: '0.2rem 0.5rem',
+                                                            borderRadius: '999px',
+                                                            fontSize: '0.7rem',
+                                                            fontWeight: 600,
+                                                            background: indent.typeOfIndent === 'INCAMP_TO' ? '#dbeafe' : '#f3f4f6',
+                                                            color: indent.typeOfIndent === 'INCAMP_TO' ? '#1e40af' : '#374151'
+                                                        }}>
+                                                            {indent.typeOfIndent.replace('_', ' ')}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem', fontWeight: 500 }}>
+                                                        {formatRoute(indent)}
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem', color: 'var(--fg-secondary)' }}>{indent.purpose}</td>
+                                                    <td style={{ padding: '0.75rem 1rem' }}>{indent.vehicleType}</td>
+                                                    <td style={{ padding: '0.75rem 1rem', color: indent.transportOperator ? 'var(--fg-primary)' : 'var(--fg-tertiary)' }}>
+                                                        {indent.transportOperator || 'TBC'}
+                                                    </td>
+                                                    <td style={{ padding: '0.75rem 1rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}>
+                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: indent.status === 'APPROVED' ? '#10b981' : indent.status === 'REJECTED' ? '#ef4444' : '#f59e0b' }} />
+                                                            {indent.status}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+
 
             {/* Detail Modal */}
             {selectedIndent && (

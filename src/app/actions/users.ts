@@ -95,8 +95,22 @@ export async function updateUserStatus(userId: string, status: 'ACTIVE' | 'REJEC
     }
 }
 
-export async function updateUserRole(userId: string, role: UserRole) {
+import { auth } from '@/auth';
+
+export async function updateUserRole(userId: string, role: UserRole, adminPassword?: string) {
     try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: 'Unauthorized' };
+
+        // Verify Admin Password
+        if (!adminPassword) return { success: false, error: 'Password required' };
+
+        const admin = await prisma.user.findUnique({ where: { email: session.user.email } });
+        if (!admin) return { success: false, error: 'Admin not found' };
+
+        const isMatch = await bcrypt.compare(adminPassword, admin.password);
+        if (!isMatch) return { success: false, error: 'Invalid password' };
+
         await prisma.user.update({
             where: { id: userId },
             data: { role }
@@ -108,8 +122,20 @@ export async function updateUserRole(userId: string, role: UserRole) {
     }
 }
 
-export async function deleteUserAction(userId: string) {
+export async function deleteUserAction(userId: string, adminPassword?: string) {
     try {
+        const session = await auth();
+        if (!session?.user?.email) return { success: false, error: 'Unauthorized' };
+
+        // Verify Admin Password
+        if (!adminPassword) return { success: false, error: 'Password required' };
+
+        const admin = await prisma.user.findUnique({ where: { email: session.user.email } });
+        if (!admin) return { success: false, error: 'Admin not found' };
+
+        const isMatch = await bcrypt.compare(adminPassword, admin.password);
+        if (!isMatch) return { success: false, error: 'Invalid password' };
+
         await prisma.user.delete({
             where: { id: userId }
         });

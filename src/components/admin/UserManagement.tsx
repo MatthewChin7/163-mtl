@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction, deleteUserAction, updateUserAction, getRoleRequests, updateRoleRequestStatus } from '@/app/actions/users';
 import { User, RoleRequest, UserRole } from '@/types';
 import { Check, X, Shield, Clock, Plus, Edit, Trash2 } from 'lucide-react';
+import PasswordConfirmModal from './PasswordConfirmModal';
 
 interface UserManagementProps {
     currentUser: User;
@@ -126,8 +127,38 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         ? ['APPROVER_MTC']
         : ['REQUESTOR', 'APPROVER_AS3', 'APPROVER_S3', 'APPROVER_MTC', 'ADMIN'];
 
+    // Password Modal State
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [pendingAction, setPendingAction] = useState<{
+        type: 'DELETE' | 'UPDATE_ROLE';
+        userId: string;
+        payload?: any;
+    } | null>(null);
+
     return (
         <div className="space-y-8">
+            <PasswordConfirmModal
+                isOpen={showPasswordModal}
+                onClose={() => { setShowPasswordModal(false); setPendingAction(null); }}
+                actionName={pendingAction?.type === 'DELETE' ? 'Delete User' : 'Update User Role'}
+                onConfirm={async (password) => {
+                    if (!pendingAction) return;
+
+                    if (pendingAction.type === 'DELETE') {
+                        const res = await deleteUserAction(pendingAction.userId, password);
+                        if (!res.success) throw new Error(res.error || 'Failed to delete');
+                        refresh();
+                    } else if (pendingAction.type === 'UPDATE_ROLE') {
+                        const res = await updateUserRole(pendingAction.userId, pendingAction.payload, password);
+                        if (!res.success) throw new Error(res.error || 'Failed to verify');
+                        setEditingUserId(null); // Exit edit mode
+                        refresh();
+                    }
+                    setShowPasswordModal(false);
+                    setPendingAction(null);
+                }}
+            />
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -345,7 +376,11 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                         {currentUser.role === 'ADMIN' && (
                                             editingUserId === u.id ? (
                                                 <div className="flex gap-2 justify-end">
-                                                    <button className="text-xs btn-primary px-2 py-1 rounded" onClick={() => handleRoleUpdate(u.id, tempRole)}>Save</button>
+                                                    <button className="text-xs btn-primary px-2 py-1 rounded" onClick={() => {
+                                                        // Trigger Modal instead of direct call
+                                                        setPendingAction({ type: 'UPDATE_ROLE', userId: u.id, payload: tempRole });
+                                                        setShowPasswordModal(true);
+                                                    }}>Save</button>
                                                     <button className="text-xs opacity-60" onClick={() => setEditingUserId(null)}>Cancel</button>
                                                 </div>
                                             ) : (
@@ -359,7 +394,12 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                     </button>
                                                     <button
                                                         className="opacity-50 hover:opacity-100 hover:text-red-600 ml-2"
-                                                        onClick={() => handleDeleteUser(u.id)}
+                                                        onClick={() => {
+                                                            if (!confirm('Are you sure you want to delete this user?')) return;
+                                                            // Trigger Modal
+                                                            setPendingAction({ type: 'DELETE', userId: u.id });
+                                                            setShowPasswordModal(true);
+                                                        }}
                                                         title="Delete User"
                                                     >
                                                         <Trash2 size={16} />

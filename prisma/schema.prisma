@@ -72,7 +72,7 @@ model Indent {
 
   // Core Data
   status        IndentStatus @default(DRAFT)
-  vehicleType   VehicleType
+  vehicleType   String // Changed from Enum to String for dynamic config
   vehicleTypeOther String?
   vehicleNumber String?
   equipmentNumber String?
@@ -111,6 +111,9 @@ model Indent {
   rplTiming            String?
   parkingLotNumber     String?
 
+  // Approval Workflow Fields
+  editorRole           UserRole?     // Role of the person who made the edit/suggestion
+  previousStatus       IndentStatus? // To restore status or track history
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -126,4 +129,57 @@ model RoleRequest {
   status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
   
   createdAt     DateTime  @default(now())
+}
+
+// Duty Roster for MTC Schedule
+model DutyRoster {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  rankName  String   // e.g. "LCP Tan"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+
+// Forgot Password Token
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+}
+
+// --- Dynamic Configuration Models ---
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model VehicleConfig {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model LocationConfig {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  category            String   // IN_CAMP, OUT_CAMP
+  restrictedAuthority String?  // e.g. "160SQN"
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+}
+
+model RPLSchedule {
+  id        String   @id @default(cuid())
+  time      String   // e.g. "11:45am"
+  type      String   // ARRIVE, DEPART
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }

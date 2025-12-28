@@ -76,21 +76,22 @@ export default function LoginPage() {
                     </div>
 
                     <div className="mb-3">
-                      <div className="mb-2 w-100">
-                        <label className="text-muted" htmlFor="password">Password</label>
-                        <Link href="/forgot-password" className="float-end">
-                          Forgot Password?
-                        </Link>
+                      <div className="form-group mb-6">
+                        <label className="text-xs font-semibold uppercase text-gray-500 mb-1 block">Password</label>
+                        <input
+                          type="password"
+                          className="input w-full"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                        />
+                        <div className="flex justify-end mt-1">
+                          <Link href="/forgot-password" style={{ fontSize: '0.75rem', color: 'var(--primary)', textDecoration: 'none' }}>
+                            Forgot Password?
+                          </Link>
+                        </div>
                       </div>
-                      <input
-                        id="password"
-                        type="password"
-                        className="form-control"
-                        name="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
                       {error && (
                         <div className="text-danger mt-2" style={{ fontSize: '0.875rem' }}>
                           {error}

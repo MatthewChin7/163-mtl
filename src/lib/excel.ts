@@ -25,7 +25,7 @@ export const exportIndentsToExcel = (indents: Indent[]) => {
     // 2. Daily Detail Sheet (Mocking logic: just same data formatted differently or filtered)
     const today = new Date().toISOString().split('T')[0];
     const dailyData = indents
-        .filter(i => i.startTime.startsWith(today))
+        .filter(i => new Date(i.startTime).toISOString().split('T')[0] === today)
         .map(indent => ({
             'Time': format(new Date(indent.startTime), 'HH:mm'),
             'Vehicle': indent.vehicleType,

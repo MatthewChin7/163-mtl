@@ -1,7 +1,7 @@
 'use client';
 
 import IndentForm from '@/components/indents/IndentForm';
-import { db } from '@/lib/store';
+import { getIndent } from '@/app/actions/indents'; // Import Indent Action
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Indent } from '@/types';
@@ -15,14 +15,17 @@ export default function EditIndentPage({ params }: { params: Promise<{ id: strin
     const { id } = use(params);
 
     useEffect(() => {
-        if (id) {
-            const found = db.indents.getById(id);
-            if (found) {
-                setIndent(found);
-            } else {
-                router.push('/dashboard/indents');
+        const loadIndent = async () => {
+            if (id) {
+                const found = await getIndent(id);
+                if (found) {
+                    setIndent(found as unknown as Indent);
+                } else {
+                    router.push('/dashboard/indents');
+                }
             }
-        }
+        };
+        loadIndent();
     }, [id, router]);
 
     if (!indent) return <div className="p-8">Loading...</div>;

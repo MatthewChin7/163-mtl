@@ -36,9 +36,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         { label: 'New Indent', href: '/dashboard/new-indent', icon: PlusCircle, role: 'REQUESTOR' },
         { label: 'All Indents', href: '/dashboard/indents', icon: FileText },
         { label: 'Daily MT Schedule', href: '/dashboard/schedule', icon: Calendar },
-        { label: 'Monthly Bulk Indents', href: '/dashboard/monthly', icon: FileText, role: 'APPROVER_AS3' }, // Visible to AS3/S3/MTC via logic below
+        { label: 'Monthly Bulk Indents', href: '/dashboard/bulk-indents', icon: FileText, role: 'APPROVER_AS3' }, // Visible to AS3/S3/MTC via logic below
         { label: 'In Camp TO Sched', href: '/dashboard/mtc-schedule', icon: UserIcon, role: 'APPROVER_MTC' },
-        { label: 'Admin', href: '/dashboard/admin', icon: Settings, role: 'ADMIN' },
+        { label: 'System Config', href: '/dashboard/admin/config', icon: Settings, role: 'ADMIN' },
     ];
 
     return (

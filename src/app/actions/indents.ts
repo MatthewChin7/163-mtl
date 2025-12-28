@@ -5,9 +5,31 @@ import { Indent, IndentStatus, UserRole } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email';
 
-export async function createIndent(data: any, userId: string, initialStatus: IndentStatus = 'DRAFT') {
+// Helper to determine next status based on Role Hierarchy
+function getNextStatus(role: UserRole): IndentStatus {
+    switch (role) {
+        case 'REQUESTOR': return 'PENDING_AS3';
+        case 'APPROVER_AS3': return 'PENDING_S3';
+        case 'APPROVER_S3': return 'PENDING_MTC';
+        case 'APPROVER_MTC': return 'APPROVED';
+        default: return 'PENDING_AS3';
+    }
+}
+
+export async function createIndent(data: any, userId: string, initialStatus?: IndentStatus) {
     try {
         const { waypoints, ...rest } = data;
+
+        // Fetch user to determine Role and Skip Logic
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
+        // If Draft is requested, honor it. Otherwise calculate based on Role.
+        let status: IndentStatus = 'PENDING_AS3';
+        if (initialStatus === 'DRAFT') {
+            status = 'DRAFT';
+        } else {
+            status = user ? getNextStatus(user.role) : 'PENDING_AS3';
+        }
 
         await prisma.indent.create({
             data: {
@@ -18,7 +40,7 @@ export async function createIndent(data: any, userId: string, initialStatus: Ind
                 endTime: new Date(rest.endTime),
                 waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [], // Ensure JSON compatibility
                 approvalLogs: [],
-                status: initialStatus
+                status: status
             }
         });
         revalidatePath('/dashboard');
@@ -62,41 +84,102 @@ export async function getIndents(userId?: string) {
     }
 }
 
-export async function updateIndentStatus(indentId: string, status: IndentStatus, approverId: string, reason?: string) {
+export async function getIndent(indentId: string) {
+    try {
+        const indent = await prisma.indent.findUnique({
+            where: { id: indentId }
+        });
+        return indent;
+    } catch (error) {
+        console.error('Failed to fetch indent:', error);
+        return null;
+    }
+}
+
+export async function updateIndentStatus(indentId: string, status: IndentStatus, approverId: string, reason?: string, transportOperatorName?: string) {
     try {
         // Fetch current indent to append log
         const current = await prisma.indent.findUnique({ where: { id: indentId } });
         if (!current) throw new Error('Indent not found');
 
         const logs = (current.approvalLogs as any[]) || [];
-        // Ideally fetch approver details to add name, but simplified for now
         const approver = await prisma.user.findUnique({ where: { id: approverId } });
+        const approverRole = approver?.role || 'UNKNOWN';
 
-        logs.push({
-            stage: approver?.role || 'UNKNOWN',
-            status: status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-            timestamp: new Date().toISOString(),
-            approverId,
-            approverName: approver?.name || 'Unknown',
-            reason
-        });
+        let nextStatus = status;
+
+        // SMART ROUTING LOGIC (If Requestor Accepts Changes i.e. APPROVED from PENDING_REQUESTOR)
+        if (current.status === 'PENDING_REQUESTOR' && status === 'APPROVED') {
+            // Need to skip the Editor's role
+            const editorRole = current.editorRole;
+            if (editorRole) {
+                // If AS3 edited, next should be S3.
+                nextStatus = getNextStatus(editorRole);
+            } else {
+                nextStatus = 'PENDING_AS3'; // Default reset if unknown
+            }
+            // Log as "Accepted Changes"
+            logs.push({
+                stage: 'REQUESTOR',
+                status: 'APPROVED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Requestor',
+                reason: 'Accepted Changes'
+            });
+        }
+        // NORMAL APPROVAL LOGIC
+        else if (status === 'APPROVED') {
+            // Usually passed explicitly by frontend (e.g. approveIndent passes the TARGET status),
+            // OR we calculate next status here.
+            // Requirement: "If initial approver rejects, indent stops." (Handled by passing REJECTED).
+            // Requirement: "Requestor... goes up chain".
+            // If the UI passes 'APPROVED' (final status), fine.
+            // But usually UI sends the *Next Pending* status.
+            // Let's assume UI knows best for now to avoid breaking existing flows, unless it's the Requestor case above.
+
+            logs.push({
+                stage: approverRole,
+                status: 'APPROVED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Unknown',
+                reason
+            });
+        }
+        else {
+            // REJECTION
+            logs.push({
+                stage: approverRole,
+                status: 'REJECTED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Unknown',
+                reason
+            });
+        }
 
         await prisma.indent.update({
             where: { id: indentId },
             data: {
-                status,
-                approvalLogs: logs, // Prisma handles JSON array
-                reason: reason || current.reason
+                status: nextStatus,
+                approvalLogs: logs,
+                // reason: reason || current.reason, // Do NOT overwrite justification
+                cancellationReason: (status === 'REJECTED' || status === 'CANCELLED') ? reason : current.cancellationReason,
+                transportOperator: transportOperatorName || current.transportOperator,
+                previousStatus: current.status // Audit trail
             }
         });
 
-        // Send Email to Requestor if decision is made
-        if (status === 'APPROVED' || status === 'REJECTED') {
+        // Email logic (simplified)
+        if (nextStatus === 'APPROVED' || nextStatus === 'REJECTED') {
             // In real app, fetch requestor email. Assuming we have generic contact for now
             await sendEmail({
                 to: 'user@163.mil',
-                subject: `Indent #${current.serialNumber} ${status}`,
-                html: `<p>Your indent <strong>#${current.serialNumber}</strong> has been <strong>${status}</strong> by ${approver?.role}.</p>`
+                subject: `Indent #${current.serialNumber} ${nextStatus}`,
+                html: `<p>Your indent <strong>#${current.serialNumber}</strong> has been <strong>${nextStatus}</strong> by ${approver?.role
+                    }.</p>${transportOperatorName ? `<p><strong>Transport Operator:</strong> ${transportOperatorName}</p>` : ''
+                    }`
             });
         }
 
@@ -108,27 +191,68 @@ export async function updateIndentStatus(indentId: string, status: IndentStatus,
     }
 }
 
-export async function updateIndent(indentId: string, data: any) {
+export async function updateIndent(indentId: string, data: any, editorUserId?: string) {
     try {
-        const { waypoints, ...rest } = data;
-
-        // Exclude fields that shouldn't be updated directly or handled separately
-        // e.g. serialNumber, createdAt, requestorId
+        const { waypoints, submit, ...rest } = data; // specific submit flag
         const { serialNumber, createdAt, requestorId, id, ...updateData } = rest;
+
+        // Base update data
+        let finalUpdateData: any = {
+            ...updateData,
+            startTime: new Date(updateData.startTime),
+            endTime: new Date(updateData.endTime),
+            waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [],
+        };
+
+        // Status Logic
+        if (editorUserId) {
+            const editor = await prisma.user.findUnique({ where: { id: editorUserId } });
+
+            // 1. Approver Edit Logic
+            if (editor && (editor.role === 'APPROVER_AS3' || editor.role === 'APPROVER_S3')) {
+                finalUpdateData.status = 'PENDING_REQUESTOR';
+                finalUpdateData.editorRole = editor.role;
+
+                // Fetch current to save previous status
+                // (Ideally check if status changes, but for Approver Edit -> Requestor, yes)
+                const current = await prisma.indent.findUnique({ where: { id: indentId } });
+                if (current) finalUpdateData.previousStatus = current.status;
+            }
+
+            // 2. Draft Submission Logic (Requestor submitting draft)
+            // If explicit "submit" flag is true
+            if (submit && editor) {
+                // Calculate Next Status
+                const nextStatus = getNextStatus(editor.role);
+                // Only update status if it's currently DRAFT? 
+                // Or blind update? Blind update allows re-submission if stuck? 
+                // Assume transitions from DRAFT.
+                finalUpdateData.status = nextStatus;
+            }
+        }
 
         await prisma.indent.update({
             where: { id: indentId },
-            data: {
-                ...updateData,
-                startTime: new Date(updateData.startTime),
-                endTime: new Date(updateData.endTime),
-                waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [],
-            }
+            data: finalUpdateData
         });
         revalidatePath('/dashboard');
         return { success: true };
     } catch (error) {
         console.error('Failed to update indent:', error);
         return { success: false, error: 'Update Failed' };
+    }
+}
+
+export async function updateTransportOperator(indentId: string, transportOperatorName: string) {
+    try {
+        await prisma.indent.update({
+            where: { id: indentId },
+            data: { transportOperator: transportOperatorName }
+        });
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update TO:', error);
+        return { success: false, error: 'Failed to update Transport Operator' };
     }
 }

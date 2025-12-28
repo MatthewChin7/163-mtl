@@ -1,20 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User } from '@/types';
-import { db } from '@/lib/store';
-import { auth } from '@/lib/auth';
+import { getAllUsers } from '@/app/actions/users'; // Real DB
+import { signIn } from 'next-auth/react'; // Real Auth
 import { useRouter } from 'next/navigation';
 
 export default function LoginView() {
     const router = useRouter();
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const users = db.users.getAll();
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const handleLogin = () => {
+    useEffect(() => {
+        getAllUsers().then(res => {
+            setUsers(res as unknown as User[]);
+            setLoading(false);
+        });
+    }, []);
+
+    const handleLogin = async () => {
         if (selectedUser) {
-            auth.login(selectedUser.id);
-            router.push('/dashboard');
+            // Attempt to login with default 'password' or prompt?
+            // For simulation convenience, we try 'password'.
+            // In a real app, this screen shouldn't exist in prod.
+            const res = await signIn('credentials', {
+                email: selectedUser.email,
+                password: 'password', // Assumed default for test users
+                redirect: false,
+                callbackUrl: '/dashboard'
+            });
+
+            if (res?.ok) {
+                router.push('/dashboard');
+            } else {
+                alert("Login failed. Password might not be 'password'.");
+            }
         }
     };
 
