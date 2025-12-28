@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma" // Use absolute import
 import { loginUserAction } from "@/app/actions/users"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { UserRole } from "@/types"
+import { jwtVerify } from 'jose'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     adapter: PrismaAdapter(prisma) as any,
@@ -12,15 +13,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 email: {},
                 password: {},
+                impersonationToken: {}
             },
             authorize: async (credentials) => {
-                if (!credentials?.email || !credentials?.password) return null
+                // 1. Check for Impersonation Token
+                if (credentials?.impersonationToken) {
+                    try {
+                        const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+                        const { payload } = await jwtVerify(credentials.impersonationToken as string, secret);
 
-                const user = await loginUserAction(credentials.email as string, credentials.password as string)
-
-                if (!user || 'error' in user) {
-                    return null
+                        // Verify payload structure
+                        if (payload.isImpersonation && payload.sub) {
+                            // Fetch the target user
+                            const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+                            if (user) return { ...user, isImpersonation: true };
+                        }
+                    } catch (e) {
+                        console.error("Impersonation token verification failed", e);
+                        return null;
+                    }
                 }
+
+                // 2. Normal Login Flow
+                if (!credentials?.email || !credentials?.password) return null
+                const user = await loginUserAction(credentials.email as string, credentials.password as string)
+                if (!user || 'error' in user) return null
 
                 return user
             },
@@ -35,6 +52,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.role = u.role;
                 token.id = u.id;
                 token.status = u.status;
+                if (u.isImpersonation) token.isImpersonation = true;
             }
             return token;
         },
@@ -44,6 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 s.role = token.role as UserRole;
                 s.id = token.id as string;
                 s.status = token.status as string;
+                if (token.isImpersonation) s.isImpersonation = true;
             }
             return session;
         }

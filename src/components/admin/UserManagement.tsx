@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction, deleteUserAction, updateUserAction, getRoleRequests, updateRoleRequestStatus } from '@/app/actions/users';
+import { generateImpersonationToken } from '@/app/actions/admin';
+import { signIn } from 'next-auth/react';
 import { User, RoleRequest, UserRole } from '@/types';
-import { Check, X, Shield, Clock, Plus, Edit, Trash2 } from 'lucide-react';
+import { Check, X, Shield, Clock, Plus, Edit, Trash2, LogIn } from 'lucide-react';
 import PasswordConfirmModal from './PasswordConfirmModal';
 
 interface UserManagementProps {
@@ -384,27 +386,54 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                     <button className="text-xs opacity-60" onClick={() => setEditingUserId(null)}>Cancel</button>
                                                 </div>
                                             ) : (
-                                                <>
+                                                <div className="flex gap-2 justify-end">
+                                                    {u.role !== 'ADMIN' && (
+                                                        <button
+                                                            className="btn btn-sm btn-outline-primary flex items-center gap-1.5 px-3"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    // 1. Generate Recovery Token for Admin
+                                                                    const adminTokenRes = await generateImpersonationToken(currentUser.id);
+                                                                    if (typeof window !== 'undefined') {
+                                                                        localStorage.setItem('admin_recovery_token', adminTokenRes.token);
+                                                                    }
+
+                                                                    // 2. Generate Token for Target User
+                                                                    const { token } = await generateImpersonationToken(u.id);
+
+                                                                    // 3. Switch User
+                                                                    await signIn('credentials', { impersonationToken: token, callbackUrl: '/dashboard' });
+                                                                } catch (e) {
+                                                                    alert('Impersonation failed: ' + e);
+                                                                }
+                                                            }}
+                                                            title="View as this user"
+                                                        >
+                                                            <LogIn size={14} />
+                                                            Login As
+                                                        </button>
+                                                    )}
+
                                                     <button
-                                                        className="opacity-50 hover:opacity-100"
+                                                        className="btn btn-sm btn-ghost flex items-center gap-1.5 px-3 text-gray-600 hover:bg-gray-100"
                                                         onClick={() => { setEditingUserId(u.id); setTempRole(u.role); }}
-                                                        title="Edit Role"
                                                     >
-                                                        <Edit size={16} />
+                                                        <Edit size={14} />
+                                                        Edit
                                                     </button>
+
                                                     <button
-                                                        className="opacity-50 hover:opacity-100 hover:text-red-600 ml-2"
+                                                        className="btn btn-sm btn-ghost flex items-center gap-1.5 px-3 text-red-600 hover:bg-red-50"
                                                         onClick={() => {
                                                             if (!confirm('Are you sure you want to delete this user?')) return;
-                                                            // Trigger Modal
                                                             setPendingAction({ type: 'DELETE', userId: u.id });
                                                             setShowPasswordModal(true);
                                                         }}
-                                                        title="Delete User"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={14} />
+                                                        Delete
                                                     </button>
-                                                </>
+                                                </div>
                                             )
                                         )}
                                     </td>
