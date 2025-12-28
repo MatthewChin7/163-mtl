@@ -190,3 +190,53 @@ export async function requestRoleChange(userId: string, newRole: UserRole) {
         return { success: false, error: 'Request failed' };
     }
 }
+
+export async function getRoleRequests() {
+    try {
+        const requests = await prisma.roleRequest.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: { user: true }
+        });
+
+        return requests.map(r => ({
+            id: r.id,
+            userId: r.userId,
+            userName: r.user.name,
+            currentRole: r.currentRole,
+            requestedRole: r.requestedRole,
+            status: r.status,
+            createdAt: r.createdAt.toISOString()
+        }));
+    } catch (error) {
+        console.error('Failed to fetch role requests:', error);
+        return [];
+    }
+}
+
+export async function updateRoleRequestStatus(requestId: string, status: 'APPROVED' | 'REJECTED') {
+    try {
+        const request = await prisma.roleRequest.findUnique({ where: { id: requestId } });
+        if (!request) return { success: false, error: 'Request not found' };
+
+        await prisma.roleRequest.update({
+            where: { id: requestId },
+            data: { status }
+        });
+
+        if (status === 'APPROVED') {
+            await prisma.user.update({
+                where: { id: request.userId },
+                data: { role: request.requestedRole }
+            });
+
+            // Optionally send email notification here
+        }
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to update role request:', error);
+        return { success: false, error: 'Update failed' };
+    }
+}
+

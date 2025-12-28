@@ -108,8 +108,9 @@ model Indent {
   // RPL
   rplTimingDepart      String?
   rplTimingArrive      String?
-  rplTiming            String? // Legacy/Main timing
+  rplTiming            String?
   parkingLotNumber     String?
+
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

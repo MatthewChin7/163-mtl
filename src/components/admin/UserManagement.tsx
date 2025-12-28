@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction, deleteUserAction, updateUserAction } from '@/app/actions/users';
+import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction, deleteUserAction, updateUserAction, getRoleRequests, updateRoleRequestStatus } from '@/app/actions/users';
 import { User, RoleRequest, UserRole } from '@/types';
 import { Check, X, Shield, Clock, Plus, Edit, Trash2 } from 'lucide-react';
 
@@ -50,8 +50,9 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
             return !duplicate;
         });
         setUsers(unique as User[]);
-        // Role requests not yet implemented in backend, keeping empty for now
-        setRoleRequests([]);
+        // Fetch Role Requests
+        const loadedRequests = await getRoleRequests();
+        setRoleRequests(loadedRequests as any); // Cast to handle the mapped structure
     };
 
     const refresh = () => setRefreshTrigger(p => p + 1);
@@ -67,9 +68,13 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
     };
 
     // simplified: Role Requests logic removed for now as backend doesn't support generic Request table yet
-    const handleRequestDecision = (reqId: string, decision: 'APPROVED' | 'REJECTED') => {
-        // Placeholder
-        alert('Role Request feature coming soon');
+    const handleRequestDecision = async (reqId: string, decision: 'APPROVED' | 'REJECTED') => {
+        const res = await updateRoleRequestStatus(reqId, decision);
+        if (res.success) {
+            refresh();
+        } else {
+            alert('Failed to process request: ' + res.error);
+        }
     };
 
     const handleUserApproval = async (userId: string, decision: 'ACTIVE' | 'REJECTED') => {

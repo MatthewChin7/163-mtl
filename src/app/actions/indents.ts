@@ -5,7 +5,7 @@ import { Indent, IndentStatus, UserRole } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { sendEmail } from '@/lib/email';
 
-export async function createIndent(data: any, userId: string) {
+export async function createIndent(data: any, userId: string, initialStatus: IndentStatus = 'DRAFT') {
     try {
         const { waypoints, ...rest } = data;
 
@@ -18,7 +18,7 @@ export async function createIndent(data: any, userId: string) {
                 endTime: new Date(rest.endTime),
                 waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [], // Ensure JSON compatibility
                 approvalLogs: [],
-                status: 'DRAFT'
+                status: initialStatus
             }
         });
         revalidatePath('/dashboard');
