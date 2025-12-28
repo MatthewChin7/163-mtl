@@ -1,8 +1,8 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { auth } from '@/lib/auth';
+import { useSession, signOut } from 'next-auth/react';
 import { User } from '@/types';
 import { LogOut, PieChart, PlusCircle, FileText, Settings, Menu, Calendar, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -14,23 +14,22 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const router = useRouter();
     const pathname = usePathname();
-    const [user, setUser] = useState<User | null>(null);
+    const { data: session, status } = useSession();
 
     useEffect(() => {
-        const u = auth.getCurrentUser();
-        if (!u) {
+        if (status === 'unauthenticated') {
             router.push('/');
-        } else {
-            setUser(u);
         }
-    }, [router]);
+    }, [status, router]);
 
     const handleLogout = () => {
-        auth.logout();
-        router.push('/');
+        signOut({ callbackUrl: '/' });
     };
 
-    if (!user) return null;
+    if (status === 'loading') return <div className="p-8">Loading session...</div>;
+    if (!session || !session.user) return null;
+
+    const user = session.user as User; // Cast to our User type (ensure session callback provided role)
 
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', icon: PieChart },

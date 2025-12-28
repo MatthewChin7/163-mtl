@@ -1,13 +1,16 @@
 'use client';
 
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/store';
+import { useSession } from 'next-auth/react';
 import UserManagement from '@/components/admin/UserManagement';
 
 export default function AdminPage() {
-    const user = auth.getCurrentUser();
-    const allUsers = db.users.getAll();
+    const { data: session, status } = useSession();
 
+    if (status === 'loading') return <div>Loading...</div>;
+
+    const user = session?.user as any; // Cast as needed for Role
+
+    // Client-side protection (DashboardLayout also handles this, but double check)
     if (!user || user.role !== 'ADMIN') {
         return <div style={{ padding: '2rem' }}>Access Denied</div>;
     }
