@@ -31,7 +31,9 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError('Login failed. Check credentials or approval status.');
+      // Debugging help: Show exact error
+      alert('Login Error: ' + result.error);
+      setError('Login failed: ' + result.error);
       setLoading(false);
     } else {
       // Success
