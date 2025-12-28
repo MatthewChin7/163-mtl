@@ -43,7 +43,20 @@ export async function loginUserAction(email: string, password: string) {
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        let isMatch = await bcrypt.compare(password, user.password);
+
+        // FALLBACK: Check if password is plain text (legacy support)
+        if (!isMatch && user.password === password) {
+            console.log("Migrating legacy plain-text password for user:", user.email);
+            // Re-hash and save
+            const hashedPassword = await bcrypt.hash(password, 10);
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: hashedPassword }
+            });
+            isMatch = true;
+        }
+
         if (!isMatch) return null;
 
         if (user.status !== 'ACTIVE') return { error: 'PENDING_APPROVAL' }; // Special marker
