@@ -82,11 +82,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             const recoveryToken = typeof window !== 'undefined' ? localStorage.getItem('admin_recovery_token') : null;
                             if (recoveryToken) {
                                 try {
+                                    // Clear current session first to prevent Header Overflow (431)
+                                    await signOut({ redirect: false });
+                                    // Re-login as Admin
                                     await signIn('credentials', { impersonationToken: recoveryToken, callbackUrl: '/dashboard/admin' });
                                     localStorage.removeItem('admin_recovery_token');
                                 } catch (e) {
                                     console.error("Failed to restore admin session", e);
-                                    handleLogout();
+                                    window.location.href = '/';
                                 }
                             } else {
                                 handleLogout();
@@ -123,9 +126,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     height: isImpersonating ? 'calc(100vh - 40px)' : '100vh',
                     zIndex: 10
                 }}>
-                    <div style={{ marginBottom: '3rem' }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--fg-primary)' }}>163MTL</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--fg-secondary)' }}>Transport Management</div>
+                    <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <img src="/logo.png" alt="163 SQN" style={{ height: '56px', width: 'auto', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))' }} />
+                        <div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--fg-primary)', lineHeight: 1 }}>163 MTL</div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--fg-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Transport Ops</div>
+                        </div>
                     </div>
 
                     <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
@@ -166,10 +172,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     {item.subItems && (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
                                             {item.subItems.map(sub => {
-                                                // Simple check for query param match if needed, but pathname check is cleaner.
-                                                // Since usePathname doesn't include query, we need to be careful.
-                                                // Actually, client side isActive check for query params is tricky without useSearchParams.
-                                                // For now, let's just make them links.
                                                 return (
                                                     <Link
                                                         key={sub.href}
@@ -198,7 +200,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
                         <Link href="/dashboard/profile" style={{ textDecoration: 'none', color: 'inherit' }}>
                             <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center', cursor: 'pointer' }} className="hover:opacity-80 transition-opacity">
-                                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 600 }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 600, boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)' }}>
                                     {user.name.charAt(0)}
                                 </div>
                                 <div style={{ flex: 1, overflow: 'hidden' }}>

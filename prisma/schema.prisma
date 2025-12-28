@@ -57,6 +57,7 @@ model User {
   role          UserRole  @default(REQUESTOR)
   rank          String?
   unit          String?   @default("163 SQN")
+  image         String?   // Profile picture URL or Base64
   status        String    @default("PENDING") // ACTIVE, PENDING, REJECTED
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { UserRole } from '@/types';
-import { Save, ShieldAlert, Key } from 'lucide-react';
+import { Save, ShieldAlert, Key, Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { updateUserProfile, requestRoleChange } from '@/app/actions/users';
+import { updateUserImage } from '@/app/actions/profile';
+import { useToast } from '@/components/ui/Toast';
 
 export default function ProfilePage() {
     const router = useRouter();
     const { data: session, status } = useSession();
+    const { showToast } = useToast();
 
     // Form State
     const [formData, setFormData] = useState({
@@ -22,6 +25,7 @@ export default function ProfilePage() {
 
     // Role Request State
     const [requestedRole, setRequestedRole] = useState<UserRole>('REQUESTOR');
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         if (session?.user) {
@@ -55,20 +59,47 @@ export default function ProfilePage() {
         const res = await updateUserProfile(user.id, updateData);
 
         if (res.success) {
-            alert("Profile updated successfully. Page will reload to update session.");
+            showToast("Profile updated successfully", "success");
             setFormData(prev => ({ ...prev, password: '' })); // Clear password field
-            window.location.reload(); // Force reload to refresh session token data
+            // No reload needed usually if we just update session or if we don't care about immediate reflect in header
+            // But to reflect changes in header immediately, reload is easy way
+            setTimeout(() => window.location.reload(), 1000);
         } else {
-            alert("Update failed: " + res.error);
+            showToast("Update failed: " + res.error, "error");
         }
     };
 
     const handleRequestRole = async () => {
         const res = await requestRoleChange(user.id, requestedRole);
         if (res.success) {
-            alert("Role change request sent to Admin.");
+            showToast("Role change request sent to Admin.", "success");
         } else {
-            alert("Request failed: " + res.error);
+            showToast("Request failed: " + res.error, "error");
+        }
+    };
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 1024 * 1024) { // 1MB limit
+                showToast('Image too large (max 1MB)', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64 = reader.result as string;
+                setUploading(true);
+                const res = await updateUserImage(base64);
+                setUploading(false);
+                if (res.success) {
+                    showToast('Profile image updated', 'success');
+                    // Force reload to update session user image if NextAuth doesn't auto sync
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    showToast('Failed to update image', 'error');
+                }
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -77,7 +108,34 @@ export default function ProfilePage() {
             <h1 style={{ fontSize: '1.875rem', fontWeight: 700, marginBottom: '2rem' }}>My Profile</h1>
 
             <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Personal Information</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginBottom: '2rem' }}>
+                    <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '2rem',
+                        fontWeight: 700,
+                        color: 'white',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        {user.name?.charAt(0)}
+                    </div>
+                    <div>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{user.name}</h2>
+                        <div style={{ color: 'var(--fg-secondary)' }}>{user.email}</div>
+                        <div style={{ marginTop: '0.5rem' }}>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {user.role}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Edit Details</h2>
                 <form onSubmit={handleSaveProfile} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                     <div className="form-group">
                         <label className="text-xs font-semibold uppercase text-gray-500">Rank</label>

@@ -1,6 +1,6 @@
 'use client';
 
-import IndentForm from '@/components/indents/IndentForm';
+import IndentManager from '@/components/indents/IndentManager';
 import { getIndent } from '@/app/actions/indents'; // Import Indent Action
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -40,7 +40,7 @@ export default function EditIndentPage({ params }: { params: Promise<{ id: strin
                     ← Back
                 </button>
             </div>
-            <IndentForm initialData={indent} isEditing={true} />
+            <IndentManager initialIndent={indent} />
         </div>
     );
 }

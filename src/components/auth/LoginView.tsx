@@ -54,8 +54,9 @@ export default function LoginView() {
                 animation: 'fadeIn 0.5s ease-out'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <h1 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>163MTL</h1>
-                    <p style={{ color: 'var(--fg-secondary)' }}>Transport Management Portal</p>
+                    <img src="/logo.png" alt="163 SQN" style={{ width: '120px', height: 'auto', marginBottom: '1.5rem', filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.15))' }} />
+                    <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.25rem', letterSpacing: '-0.02em', color: 'var(--fg-primary)' }}>163 MTL</h1>
+                    <p style={{ color: 'var(--fg-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem', fontWeight: 600 }}>Transport Management Portal</p>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

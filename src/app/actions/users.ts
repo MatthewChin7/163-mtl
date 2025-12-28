@@ -61,8 +61,8 @@ export async function loginUserAction(email: string, password: string) {
 
         if (user.status !== 'ACTIVE') return { error: 'PENDING_APPROVAL' }; // Special marker
 
-        // Remove sensitive data
-        const { password: _, ...cleanUser } = user;
+        // Remove sensitive data and large fields (image) to prevent Cookie Overflow (HTTP 431)
+        const { password: _, image: __, ...cleanUser } = user;
         return cleanUser;
     } catch (error) {
         console.error('Login failed:', error);

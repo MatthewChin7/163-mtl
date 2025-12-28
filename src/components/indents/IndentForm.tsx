@@ -6,18 +6,23 @@ import { Indent, VehicleType, UserRole, LocationCategory, InCampLocation, OutCam
 
 import { getActiveVehicles, getActiveLocations, getRPLSchedule, getSystemSettings } from '@/app/actions/config';
 import { useSession } from 'next-auth/react';
-import { createIndent, updateIndent } from '@/app/actions/indents';
-import { AlertTriangle, Save } from 'lucide-react';
+import { createIndent, updateIndent, deleteIndent } from '@/app/actions/indents';
+import { AlertTriangle, Save, Trash2, Send } from 'lucide-react';
+
+import { useToast } from '@/components/ui/Toast';
 
 interface IndentFormProps {
     initialData?: Indent;
+    prefillData?: Partial<Indent>;
     isEditing?: boolean;
+    onAction?: (action: 'ADD_NEW' | 'DUPLICATE' | 'SUBMIT' | 'DELETE', data?: any) => void;
 }
 
-export default function IndentForm({ initialData, isEditing = false }: IndentFormProps) {
+export default function IndentForm({ initialData, prefillData, isEditing = false, onAction }: IndentFormProps) {
     const router = useRouter();
     const { data: session } = useSession();
     const user = session?.user as User;
+    const { showToast } = useToast(); // Use the hook
 
     // Dynamic Options State
     const [vehicleOptions, setVehicleOptions] = useState<{ id: string, name: string }[]>([]);
@@ -46,31 +51,58 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
     // Helper to format date for datetime-local input
     const formatDateForInput = (dateStr?: string | Date) => {
         if (!dateStr) return '';
-        const d = new Date(dateStr);
-        // Manual formatting to preserve local time values
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            // Manual formatting to preserve local time values
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        } catch (e) {
+            console.error('Date parsing error', e);
+            return '';
+        }
     };
 
-    const [formData, setFormData] = useState<Partial<Indent>>(initialData ? {
-        ...initialData,
-        startTime: formatDateForInput(initialData.startTime) as any,
-        endTime: formatDateForInput(initialData.endTime) as any,
-    } : {
-        vehicleType: 'OUV', // Default, might be invalid if OUV disabled, handle in validation
-        typeOfIndent: 'NORMAL_MTC',
-        vehicleCommanderName: 'TBC',
-        startLocationCategory: 'IN_CAMP',
-        startLocation: 'LCK II', // Default
-        endLocationCategory: 'OUT_CAMP',
-        endLocation: 'ME', // Default
-        purpose: '',
-        reason: '',
+    const [formData, setFormData] = useState<Partial<Indent>>(() => {
+        const source = initialData || prefillData;
+        if (source) {
+            return {
+                ...source,
+                startTime: formatDateForInput(source.startTime) as any,
+                endTime: formatDateForInput(source.endTime) as any,
+                // Ensure other fields are carried over safely
+                status: source.status || 'DRAFT',
+            };
+        }
+        return {
+            vehicleType: 'OUV', // Default, might be invalid if OUV disabled, handle in validation
+            typeOfIndent: 'NORMAL_MTC',
+            vehicleCommanderName: 'TBC',
+            startLocationCategory: 'IN_CAMP',
+            startLocation: 'LCK II', // Default
+            endLocationCategory: 'OUT_CAMP',
+            endLocation: 'ME', // Default
+            purpose: '',
+            reason: '',
+        };
     });
+
+    // Sync initialData or prefillData if they change later (though usually valid on mount)
+    useEffect(() => {
+        const source = initialData || prefillData;
+        if (source && !formData.id) { // Only if we haven't started editing? Or force sync?
+            // Actually, forcing sync might overwrite user input if props change. 
+            // Better to trust the lazy initializer for the "New" cases where props are stable.
+            // But for Edit, if data fetches late, we might need this.
+            // However, EditPage only renders Form after data is loaded.
+            // So this useEffect might not be strictly necessary, but good for safety if architecture changes.
+            // I will leave it out to avoid overwriting user inputs if parent re-renders.
+        }
+    }, [initialData, prefillData]);
 
     // ... (keep auto-populate TO logic)
 
@@ -116,9 +148,25 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
         // ... Existing logic checks can stay ...
 
         // Determine Status based on intent
-        const status: any = intent === 'DRAFT' ? 'DRAFT' : 'PENDING_AS3'; // Or whatever generic pending state
+        // 'ADD_ANOTHER' and 'DUPLICATE' should just "Save" (DRAFT), not Submit.
+        // 'DELETE' is special case.
+        const status: any = (intent === 'DRAFT' || intent === 'ADD_ANOTHER' || intent === 'DUPLICATE') ? 'DRAFT' : 'PENDING_AS3';
 
         try {
+            if (intent === 'DELETE' as any && initialData?.id) { // explicit casting to allow DELETE flow if typed restrictively elsewhere
+                if (!confirm('Are you sure you want to delete this draft?')) return;
+                const res = await deleteIndent(initialData.id);
+                if (!res.success) throw new Error(res.error);
+
+                if (onAction) {
+                    onAction('DELETE');
+                } else {
+                    router.push('/dashboard');
+                    router.refresh();
+                }
+                showToast('Draft Deleted', 'success');
+                return;
+            }
             if (isEditing && initialData && intent === 'SUBMIT') {
                 // Update Logic (unchanged)
                 // Update Logic
@@ -172,30 +220,42 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
 
                 // Post-Submit Actions
                 if (intent === 'SUBMIT' || intent === 'DRAFT') {
-                    router.push('/dashboard');
-                    router.refresh();
+                    if (onAction) {
+                        onAction('SUBMIT', payload); // Let parent handle navigation or toast
+                    } else {
+                        // Fallback behavior
+                        router.push('/dashboard');
+                        router.refresh();
+                    }
                 } else if (intent === 'ADD_ANOTHER') {
-                    // Reset Form partly
-                    setFormData({
-                        vehicleType: 'OUV',
-                        typeOfIndent: 'NORMAL_MTC',
-                        vehicleCommanderName: 'TBC',
-                        startLocationCategory: 'IN_CAMP',
-                        startLocation: 'LCK II',
-                        endLocationCategory: 'OUT_CAMP',
-                        endLocation: 'ME',
-                        purpose: '',
-                        reason: '',
-                        // Clear specific fields
-                        startTime: '',
-                        endTime: '',
-                    });
-                    alert('Indent Saved! Ready for next entry.');
-                    window.scrollTo(0, 0);
+                    if (onAction) {
+                        onAction('ADD_NEW');
+                    } else {
+                        // Legacy reset behavior if no parent manager
+                        setFormData({
+                            vehicleType: 'OUV',
+                            typeOfIndent: 'NORMAL_MTC',
+                            vehicleCommanderName: 'TBC',
+                            startLocationCategory: 'IN_CAMP',
+                            startLocation: 'LCK II',
+                            endLocationCategory: 'OUT_CAMP',
+                            endLocation: 'ME',
+                            purpose: '',
+                            reason: '',
+                            startTime: '',
+                            endTime: '',
+                        });
+                        alert('Indent Saved! Ready for next entry.');
+                        window.scrollTo(0, 0);
+                    }
                 } else if (intent === 'DUPLICATE') {
-                    // Keep form data, just alert
-                    alert('Indent Saved! Details retained for duplication.');
-                    window.scrollTo(0, 0);
+                    if (onAction) {
+                        onAction('DUPLICATE', formData);
+                    } else {
+                        // Legacy
+                        alert('Indent Saved! Details retained for duplication.');
+                        window.scrollTo(0, 0);
+                    }
                 }
             }
         } catch (e: any) {
@@ -628,25 +688,57 @@ export default function IndentForm({ initialData, isEditing = false }: IndentFor
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => router.back()}>Cancel</button>
-
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    {/* Delete / Cancel Logic */}
+                    {isEditing && initialData?.status === 'DRAFT' ? (
+                        <button type="button" className="btn btn-ghost text-red-500" onClick={(e) => handleSubmit(e, 'DELETE' as any)} style={{ color: 'var(--status-danger)' }}>
+                            <Trash2 size={16} /> Delete Draft
+                        </button>
+                    ) : (
+                        <button type="button" className="btn btn-ghost" onClick={() => router.back()}>Cancel</button>
+                    )}
+
+                    <div style={{ flex: 1 }}></div>
+
+                    {/* Submit / Save Logic */}
                     <button type="button" className="btn btn-secondary" onClick={(e) => handleSubmit(e, 'DRAFT')}>
                         Save as Draft
                     </button>
+
                     {!isEditing && (
                         <>
                             <button type="button" className="btn btn-secondary" onClick={(e) => handleSubmit(e, 'ADD_ANOTHER')}>
-                                <Save size={16} /> Save & Add New
+                                <Save size={16} /> Add Another
                             </button>
                             <button type="button" className="btn btn-secondary" onClick={(e) => handleSubmit(e, 'DUPLICATE')}>
-                                <Save size={16} /> Save & Duplicate
+                                <Save size={16} /> Duplicate
                             </button>
                         </>
                     )}
-                    <button type="button" className="btn btn-primary" onClick={(e) => handleSubmit(e, 'SUBMIT')}>
-                        <Save size={18} /> {isEditing && initialData?.status !== 'DRAFT' && initialData?.status !== 'PENDING_REQUESTOR' ? 'Update Indent' : 'Submit Indent'}
-                    </button>
+
+                    {/* Submit Indent Button for Drafts - explicit */}
+                    {isEditing && initialData?.status === 'DRAFT' && (
+                        <button type="button" className="btn btn-primary" onClick={(e) => handleSubmit(e, 'SUBMIT')}>
+                            <Send size={16} /> Submit Indent
+                        </button>
+                    )}
+
+                    {/* Normal Submit/Update Button (Hide if Draft because we showed Submit Indent above, OR keep one?) 
+                        Actually, "Update Indent" is usually for corrections. 
+                        If I am editing a draft, "Save as Draft" updates the draft. "Submit Indent" sends it.
+                        So "Update Indent" is redundant if "Save as Draft" works.
+                        But usually "Submit" means "Update & Submit".
+                        
+                        Logic:
+                        - If Draft: [Delete] [Save Draft] [Submit Indent]
+                        - If New: [Cancel] [Save Draft] [Add Another] [Duplicate] [Submit Indent]
+                        - If Pending (Edit): [Cancel] [Update Indent]
+                    */}
+                    {(initialData?.status !== 'DRAFT' || !isEditing) && (
+                        <button type="button" className="btn btn-primary" onClick={(e) => handleSubmit(e, 'SUBMIT')}>
+                            <Save size={18} /> {isEditing ? 'Update Indent' : 'Submit Indent'}
+                        </button>
+                    )}
                 </div>
             </div>
         </form>

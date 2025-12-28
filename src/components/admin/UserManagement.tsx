@@ -7,12 +7,14 @@ import { signIn } from 'next-auth/react';
 import { User, RoleRequest, UserRole } from '@/types';
 import { Check, X, Shield, Clock, Plus, Edit, Trash2, LogIn } from 'lucide-react';
 import PasswordConfirmModal from './PasswordConfirmModal';
+import { useToast } from '@/components/ui/Toast';
 
 interface UserManagementProps {
     currentUser: User;
 }
 
 export default function UserManagement({ currentUser }: UserManagementProps) {
+    const { showToast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [roleRequests, setRoleRequests] = useState<RoleRequest[]>([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -65,8 +67,9 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         if (res.success) {
             setEditingUserId(null);
             refresh();
+            showToast('User role updated', 'success');
         } else {
-            alert('Failed to update role');
+            showToast('Failed to update role', 'error');
         }
     };
 
@@ -75,8 +78,9 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         const res = await updateRoleRequestStatus(reqId, decision);
         if (res.success) {
             refresh();
+            showToast('Request processed', 'success');
         } else {
-            alert('Failed to process request: ' + res.error);
+            showToast('Failed to process request: ' + res.error, 'error');
         }
     };
 
@@ -84,18 +88,20 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         const res = await updateUserStatus(userId, decision);
         if (res.success) {
             refresh();
+            showToast('User status updated', 'success');
         } else {
-            alert('Failed to update status');
+            showToast('Failed to update status', 'error');
         }
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+        // Confirmation is handled by Modal now
         const res = await deleteUserAction(userId);
         if (res.success) {
             refresh();
+            showToast('User deleted', 'success');
         } else {
-            alert('Failed to delete user');
+            showToast('Failed to delete user', 'error');
         }
     };
 
@@ -112,9 +118,9 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
             setIsAdding(false);
             setNewUser({ role: 'REQUESTOR', name: '', email: '', rank: '', unit: '163 SQN', password: '' });
             refresh();
-            alert('User added! They are now in the "Pending" list. Please approve them.');
+            showToast('User added! Please approve in Pending tab.', 'success');
         } else {
-            alert('Error adding user: ' + res.error);
+            showToast('Error adding user: ' + res.error, 'error');
         }
     };
 
@@ -404,7 +410,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                                     // 3. Switch User
                                                                     await signIn('credentials', { impersonationToken: token, callbackUrl: '/dashboard' });
                                                                 } catch (e) {
-                                                                    alert('Impersonation failed: ' + e);
+                                                                    showToast('Impersonation failed: ' + e, 'error');
                                                                 }
                                                             }}
                                                             title="View as this user"
@@ -425,7 +431,7 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                     <button
                                                         className="btn btn-sm btn-ghost flex items-center gap-1.5 px-3 text-red-600 hover:bg-red-50"
                                                         onClick={() => {
-                                                            if (!confirm('Are you sure you want to delete this user?')) return;
+                                                            // Direct to Modal
                                                             setPendingAction({ type: 'DELETE', userId: u.id });
                                                             setShowPasswordModal(true);
                                                         }}

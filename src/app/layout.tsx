@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { SessionProvider } from 'next-auth/react';
 import './globals.css';
+import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata: Metadata = {
   title: '163MTL | Secure Transport Management',
-  description: 'Automated Indent & Transport Management Platform',
+  description: 'Military Transport Line Management System',
 };
 
 export default function RootLayout({
@@ -15,7 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning={true}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </SessionProvider>
       </body>
     </html>
   );

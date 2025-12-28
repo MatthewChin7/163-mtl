@@ -11,7 +11,8 @@ export async function generateImpersonationToken(targetUserId: string) {
 
     // 1. Strict Security Check
     if (!session || !session.user || (session.user as any).role !== 'ADMIN') {
-        throw new Error('Unauthorized: Only Admins can generate impersonation tokens');
+        const actualRole = session?.user ? (session.user as any).role : 'No Session';
+        throw new Error(`Unauthorized: Only Admins can generate impersonation tokens. Detected Role: ${actualRole}`);
     }
 
     // 2. Verify Target Exists

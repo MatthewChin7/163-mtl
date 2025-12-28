@@ -240,10 +240,17 @@ export async function updateIndent(indentId: string, data: any, editorUserId?: s
         // Base update data
         let finalUpdateData: any = {
             ...updateData,
-            startTime: new Date(updateData.startTime),
-            endTime: new Date(updateData.endTime),
-            waypoints: waypoints ? JSON.parse(JSON.stringify(waypoints)) : [],
         };
+
+        if (updateData.startTime) {
+            finalUpdateData.startTime = new Date(updateData.startTime);
+        }
+        if (updateData.endTime) {
+            finalUpdateData.endTime = new Date(updateData.endTime);
+        }
+        if (waypoints) {
+            finalUpdateData.waypoints = JSON.parse(JSON.stringify(waypoints));
+        }
 
         // Status Logic
         if (editorUserId) {
@@ -293,7 +300,18 @@ export async function updateTransportOperator(indentId: string, transportOperato
         revalidatePath('/dashboard');
         return { success: true };
     } catch (error) {
-        console.error('Failed to update TO:', error);
-        return { success: false, error: 'Failed to update Transport Operator' };
+    }
+}
+
+export async function deleteIndent(indentId: string) {
+    try {
+        await prisma.indent.delete({
+            where: { id: indentId }
+        });
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to delete indent:', error);
+        return { success: false, error: 'Delete Failed' };
     }
 }

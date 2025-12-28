@@ -3,7 +3,7 @@
 import { Indent, User } from '@/types';
 // import { db } from '@/lib/store'; // Removed mock store usage
 import { useState } from 'react';
-import { Check, X, Eye, Edit, RotateCcw, Plus, Info } from 'lucide-react';
+import { Check, X, Eye, Edit, RotateCcw, Plus, Info, Trash2, Send } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -15,11 +15,13 @@ interface IndentListProps {
     filter?: 'ALL' | 'DRAFT' | 'PENDING' | 'APPROVED' | 'CANCELLED';
 }
 
-import { updateIndentStatus, updateTransportOperator } from '@/app/actions/indents';
+import { updateIndentStatus, updateTransportOperator, deleteIndent, updateIndent } from '@/app/actions/indents';
+import { useToast } from '@/components/ui/Toast'; // Import toast
 import IndentDetailsModal from './IndentDetailsModal';
 
 export default function IndentList({ indents, user, refreshData, filter = 'ALL' }: IndentListProps) {
     const router = useRouter();
+    const { showToast } = useToast();
     const [selectedIndent, setSelectedIndent] = useState<Indent | null>(null);
     const [actionState, setActionState] = useState<{ [key: string]: { reason: string, loading: boolean, toName?: string, isQualified?: boolean } }>({});
 
@@ -114,9 +116,62 @@ export default function IndentList({ indents, user, refreshData, filter = 'ALL' 
         const res = await updateIndentStatus(indent.id, nextStatus, user.id, reason || 'User Cancelled');
         if (res.success) {
             refreshData();
-            alert(indent.status === 'APPROVED' ? "Cancellation request submitted for approval." : "Indent cancelled.");
+            showToast(indent.status === 'APPROVED' ? "Cancellation request submitted." : "Indent cancelled.", 'success');
         } else {
-            alert("Failed to cancel: " + res.error);
+            showToast("Failed to cancel: " + res.error, 'error');
+        }
+    };
+
+    const handleDeleteDraft = async (indentId: string) => {
+        if (!confirm('Are you sure you want to delete this draft?')) return;
+
+        updateActionState(indentId, 'loading', true);
+        const res = await deleteIndent(indentId);
+        if (res.success) {
+            showToast("Draft deleted.", 'success');
+            refreshData();
+        } else {
+            showToast("Failed to delete: " + res.error, 'error');
+            updateActionState(indentId, 'loading', false);
+        }
+    };
+
+    const handleSubmitDraft = async (indentId: string) => {
+        // Submit logic: Update to PENDING_AS3
+        if (!confirm('Submit this indent for approval?')) return;
+
+        updateActionState(indentId, 'loading', true);
+        // We reuse updateIndentStatus? Or updateIndent?
+        // updateIndent is for full payload. updateIndentStatus is for status transition.
+        // Assuming draft is valid, we can just transition status?
+        // But wait, updateIndentStatus usually appends a log.
+        // If we use updateIndent, we can pass { submit: true }.
+        // Let's use updateIndentStatus if logic permits, OR import updateIndent if needed to be safe.
+        // Actually, IndentForm used updateIndent with { submit: true }.
+        // But here we are just changing status.
+        // Let's use updateIndentStatus to 'PENDING_AS3'.
+        // Wait, getNextStatus checks role.
+        // If I use updateIndentStatus('PENDING_AS3'), does it work?
+        // updateIndentStatus logic: "else if (status === 'APPROVED') ... else { REJECTION } ... "
+        // It treats anything not APPROVED/CANCELLED as REJECTED in log!
+        // See lines 191: "else { // REJECTION (Normal) logs.push REJECTED ... }"
+        // So updateIndentStatus is mainly for Approvals/Rejections.
+        // To submit a DRAFT, we should use updateIndent with { submit: true } OR create a specific submit action?
+        // Or updateIndentStatus should handle 'PENDING_AS3' explicitly?
+        // looking at `updateIndentStatus` in `indents.ts` (lines 99+), it logs REJECTED for unknown statuses.
+        // So I should use `updateIndent` with `submit: true` to trigger the submit flow properly.
+        // I need to import `updateIndent` as well.
+
+        // Let's re-import updateIndent in the top block first.
+        // const { updateIndent } = await import('@/app/actions/indents');
+
+        const res = await updateIndent(indentId, { submit: true }, user.id);
+        if (res.success) {
+            showToast("Indent submitted successfully.", 'success');
+            refreshData();
+        } else {
+            showToast("Failed to submit: " + res.error, 'error');
+            updateActionState(indentId, 'loading', false);
         }
     };
 
@@ -339,10 +394,10 @@ export default function IndentList({ indents, user, refreshData, filter = 'ALL' 
                                                     }
 
                                                     updateActionState(indent.id, 'loading', true);
-                                                    const { updateTransportOperator } = await import('@/app/actions/indents');
+                                                    // const { updateTransportOperator } = await import('@/app/actions/indents'); // Removed dynamic import
                                                     const res = await updateTransportOperator(indent.id, newName);
 
-                                                    if (res.success) {
+                                                    if (res?.success) {
                                                         refreshData();
                                                         alert("Transport Operator Updated");
                                                         updateActionState(indent.id, 'isQualified', false);
@@ -359,7 +414,27 @@ export default function IndentList({ indents, user, refreshData, filter = 'ALL' 
                                     </div>
                                 )}
 
-                                {canCancel && (
+                                {indent.status === 'DRAFT' && indent.requestorId === user.id && (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                        <button
+                                            onClick={() => handleDeleteDraft(indent.id)}
+                                            className="btn btn-ghost"
+                                            style={{ color: 'var(--status-danger)' }}
+                                            disabled={isLoading}
+                                        >
+                                            <Trash2 size={16} style={{ marginRight: '0.25rem' }} /> Delete Draft
+                                        </button>
+                                        <button
+                                            onClick={() => handleSubmitDraft(indent.id)}
+                                            className="btn btn-primary btn-sm"
+                                            disabled={isLoading}
+                                        >
+                                            <Send size={16} style={{ marginRight: '0.25rem' }} /> Submit
+                                        </button>
+                                    </div>
+                                )}
+
+                                {canCancel && indent.status !== 'DRAFT' && (
                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         <button onClick={() => handleCancel(indent)} className="btn btn-ghost" style={{ color: 'var(--status-danger)' }}>
                                             {indent.status === 'APPROVED' ? 'Request Cancellation' : 'Cancel Indent'}
