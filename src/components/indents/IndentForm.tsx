@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Indent, VehicleType, UserRole, LocationCategory, InCampLocation, OutCampLocation, Waypoint } from '@/types';
+import { Indent, VehicleType, UserRole, LocationCategory, InCampLocation, OutCampLocation, Waypoint, User } from '@/types';
 
 import { db } from '@/lib/store';
 import { ArrowLeft, ArrowRight, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
