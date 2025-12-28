@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Indent, VehicleType, UserRole, LocationCategory, InCampLocation, OutCampLocation, Waypoint } from '@/types';
-import { auth } from '@/lib/auth';
+
 import { db } from '@/lib/store';
 import { ArrowLeft, ArrowRight, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { createIndent, updateIndent } from '@/app/actions/indents';
@@ -13,9 +13,12 @@ interface IndentFormProps {
     isEditing?: boolean;
 }
 
+import { useSession } from 'next-auth/react';
+
 export default function IndentForm({ initialData, isEditing = false }: IndentFormProps) {
     const router = useRouter();
-    const user = auth.getCurrentUser();
+    const { data: session } = useSession();
+    const user = session?.user as User; // Cast to our User type
 
     const [formData, setFormData] = useState<Partial<Indent>>(initialData || {
         vehicleType: 'OUV',
