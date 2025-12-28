@@ -1,29 +1,49 @@
 'use client';
 
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/store';
+import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Indent } from '@/types';
+import { Indent, User } from '@/types';
 import Link from 'next/link';
 import { Plus, Clock, CheckCircle, XCircle } from 'lucide-react';
 import IndentList from '@/components/indents/IndentList';
+import { getIndents } from '@/app/actions/indents';
 
 export default function DashboardPage() {
+    const { data: session, status } = useSession();
     const [indents, setIndents] = useState<Indent[]>([]);
-    const user = auth.getCurrentUser();
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // In a real app, we'd fetch from API
-        setIndents(db.indents.getAll());
-    }, []);
+        loadIndents();
+    }, [session]);
 
-    if (!user) return null;
+    const loadIndents = async () => {
+        if (!session?.user) return;
+        setLoading(true);
+        const allIndents = await getIndents();
+
+        // Filter: Requestors only see their own. Approvers/Admin see all.
+        // (Ideally filtering happens on server, but doing here for MVP fix)
+        // Note: session.user.id comes from the session callback we configured
+        const user = session.user as any;
+        const filtered = user.role === 'REQUESTOR'
+            ? allIndents.filter((i: any) => i.requestorId === user.id)
+            : allIndents;
+
+        setIndents(filtered as Indent[]);
+        setLoading(false);
+    };
+
+    if (status === 'loading' || loading) return <div className="p-8">Loading dashboard...</div>;
+    if (!session?.user) return null;
+
+    const user = session.user as any;
 
     return (
         <div>
             <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Welcome back, {user.rank} {user.name}</h1>
+                    <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>Welcome back, {user.rank || ''} {user.name}</h1>
                     <p style={{ color: 'var(--fg-secondary)' }}>Here is what's happening today.</p>
                 </div>
                 {user.role === 'REQUESTOR' && (
@@ -72,9 +92,9 @@ export default function DashboardPage() {
                         <Link href="/dashboard/indents" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontSize: '0.875rem' }}>View All →</Link>
                     </div>
                     <IndentList
-                        indents={indents}
+                        indents={indents.slice(0, 5)} // Show only recent 5 on dashboard
                         user={user}
-                        refreshData={() => setIndents(db.indents.getAll())} // Simple re-fetch
+                        refreshData={loadIndents}
                     />
                 </div>
             )}

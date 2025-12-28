@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction } from '@/app/actions/users';
+import { getAllUsers, getPendingUsers, updateUserStatus, updateUserRole, registerUserAction, deleteUserAction, updateUserAction } from '@/app/actions/users';
 import { User, RoleRequest, UserRole } from '@/types';
-import { Check, X, Shield, Clock, Plus, Edit } from 'lucide-react';
+import { Check, X, Shield, Clock, Plus, Edit, Trash2 } from 'lucide-react';
 
 interface UserManagementProps {
     currentUser: User;
@@ -81,24 +81,30 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
         }
     };
 
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+        const res = await deleteUserAction(userId);
+        if (res.success) {
+            refresh();
+        } else {
+            alert('Failed to delete user');
+        }
+    };
+
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newUser.name || !newUser.email) return;
+        if (!newUser.name || !newUser.email || !newUser.password) return;
 
-        // Note: Admin add user flow usually needs password. 
-        // For now, we'll use a default temp password or ask for one.
-        // Let's assume a default for Admin-created users: "password123"
-        const res = await registerUserAction(newUser.name, newUser.email, 'password123'); // Default temp password
+        const res = await registerUserAction(newUser.name, newUser.email, newUser.password, newUser.role);
 
         if (res.success) {
-            // Admin created users should be auto-approved? 
-            // registerUserAction creates them as PENDING.
-            // We need to find the new user and approve them, or update registerUserAction to accept status.
-            // For now, let's just alert the admin to approve them in the pending list.
+            // Auto approve if added by admin? Or keep as pending. 
+            // The action creates as PENDING. 
+            // Let's assume admins might want to auto-approve, but safer to let them review.
             setIsAdding(false);
-            setNewUser({ role: 'REQUESTOR', name: '', email: '', rank: '', unit: '163 SQN' });
+            setNewUser({ role: 'REQUESTOR', name: '', email: '', rank: '', unit: '163 SQN', password: '' });
             refresh();
-            alert('User added! Please approve them in the "Pending" list. Default password: password123');
+            alert('User added! They are now in the "Pending" list. Please approve them.');
         } else {
             alert('Error adding user: ' + res.error);
         }
@@ -151,6 +157,10 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                         <div className="form-group">
                             <label className="text-xs font-semibold uppercase text-gray-500">Email / ID</label>
                             <input className="input" placeholder="e.g. tan@163.mil" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required />
+                        </div>
+                        <div className="form-group">
+                            <label className="text-xs font-semibold uppercase text-gray-500">Password</label>
+                            <input className="input" type="password" placeholder="Set password" value={newUser.password || ''} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
                         </div>
                         <div className="form-group">
                             <label className="text-xs font-semibold uppercase text-gray-500">Rank</label>
@@ -331,6 +341,13 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                     title="Edit Role"
                                                 >
                                                     <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    className="opacity-50 hover:opacity-100 hover:text-red-600 ml-2"
+                                                    onClick={() => handleDeleteUser(u.id)}
+                                                    title="Delete User"
+                                                >
+                                                    <Trash2 size={16} />
                                                 </button>
                                             )
                                         )}

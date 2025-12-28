@@ -1,54 +1,76 @@
 'use client';
 
-import { useState } from 'react';
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/store';
-import { UserRole, RoleRequest } from '@/types';
-import { Save, ShieldAlert } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { UserRole } from '@/types';
+import { Save, ShieldAlert, Key } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { updateUserProfile, requestRoleChange } from '@/app/actions/users';
 
 export default function ProfilePage() {
     const router = useRouter();
-    const user = auth.getCurrentUser();
+    const { data: session, status } = useSession();
 
     // Form State
     const [formData, setFormData] = useState({
-        name: user?.name || '',
-        rank: user?.rank || '',
-        email: user?.email || '',
-        unit: user?.unit || ''
+        name: '',
+        rank: '',
+        email: '',
+        unit: '',
+        password: '' // New password field
     });
 
     // Role Request State
     const [requestedRole, setRequestedRole] = useState<UserRole>('REQUESTOR');
-    const [requestSent, setRequestSent] = useState(false);
 
-    if (!user) return <div>Access Denied</div>;
+    useEffect(() => {
+        if (session?.user) {
+            setFormData(prev => ({
+                ...prev,
+                name: session.user.name || '',
+                rank: (session.user as any).rank || '',
+                email: session.user.email || '',
+                unit: (session.user as any).unit || '',
+            }));
+            // Initialize desired role different from current?
+        }
+    }, [session]);
 
-    const handleSaveProfile = (e: React.FormEvent) => {
+    if (status === 'loading') return <div>Loading...</div>;
+    if (!session?.user) return <div>Access Denied</div>;
+
+    const user = session.user as any;
+
+    const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
-        db.users.update(user.id, formData);
-        alert("Profile updated successfully");
-        router.refresh(); // Refresh to update sidebar if name changed
-    };
 
-    const handleRequestRole = () => {
-        const newRequest: RoleRequest = {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            userName: user.name,
-            currentRole: user.role,
-            requestedRole: requestedRole,
-            status: 'PENDING',
-            createdAt: new Date().toISOString()
+        const updateData: any = {
+            name: formData.name,
+            rank: formData.rank,
         };
-        db.roleRequests.add(newRequest);
-        setRequestSent(true);
-        alert("Role change request sent to Ops Controller.");
+        if (formData.password) {
+            updateData.password = formData.password;
+        }
+
+        const res = await updateUserProfile(user.id, updateData);
+
+        if (res.success) {
+            alert("Profile updated successfully");
+            setFormData(prev => ({ ...prev, password: '' })); // Clear password field
+            router.refresh();
+        } else {
+            alert("Update failed: " + res.error);
+        }
     };
 
-    // Check for existing pending requests
-    const pendingRequest = db.roleRequests.getAll().find(r => r.userId === user.id && r.status === 'PENDING');
+    const handleRequestRole = async () => {
+        const res = await requestRoleChange(user.id, requestedRole);
+        if (res.success) {
+            alert("Role change request sent to Admin.");
+        } else {
+            alert("Request failed: " + res.error);
+        }
+    };
 
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -67,11 +89,24 @@ export default function ProfilePage() {
                     </div>
                     <div className="form-group">
                         <label className="text-xs font-semibold uppercase text-gray-500">Email / ID</label>
-                        <input className="input" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                        <input className="input" value={formData.email} disabled title="Cannot change email" style={{ opacity: 0.7 }} />
                     </div>
                     <div className="form-group">
                         <label className="text-xs font-semibold uppercase text-gray-500">Unit</label>
-                        <input className="input" value={formData.unit} onChange={e => setFormData({ ...formData, unit: e.target.value })} />
+                        <input className="input" value={formData.unit} disabled title="Unit is fixed" style={{ opacity: 0.7 }} />
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-1">
+                            <Key size={14} /> Change Password (Optional)
+                        </label>
+                        <input
+                            className="input"
+                            type="password"
+                            placeholder="Enter new password to change"
+                            value={formData.password}
+                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        />
                     </div>
 
                     <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
@@ -93,26 +128,20 @@ export default function ProfilePage() {
                         <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{user.role}</div>
                     </div>
 
-                    {pendingRequest ? (
-                        <div style={{ color: 'var(--status-warning)', fontWeight: 600 }}>
-                            Pending Request: {pendingRequest.requestedRole}
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <select
-                                className="input"
-                                style={{ width: 'auto' }}
-                                value={requestedRole}
-                                onChange={(e) => setRequestedRole(e.target.value as UserRole)}
-                            >
-                                <option value="REQUESTOR">Requestor</option>
-                                <option value="APPROVER_AS3">Approver (AS3)</option>
-                                <option value="APPROVER_S3">Approver (S3)</option>
-                                <option value="APPROVER_MTC">Approver (MTC)</option>
-                            </select>
-                            <button className="btn btn-primary" onClick={handleRequestRole}>Request Change</button>
-                        </div>
-                    )}
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <select
+                            className="input"
+                            style={{ width: 'auto' }}
+                            value={requestedRole}
+                            onChange={(e) => setRequestedRole(e.target.value as UserRole)}
+                        >
+                            <option value="REQUESTOR">Requestor</option>
+                            <option value="APPROVER_AS3">Approver (AS3)</option>
+                            <option value="APPROVER_S3">Approver (S3)</option>
+                            <option value="APPROVER_MTC">Approver (MTC)</option>
+                        </select>
+                        <button className="btn btn-primary" onClick={handleRequestRole}>Request Change</button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,22 +1,41 @@
 'use client';
 
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/store';
+import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { Indent } from '@/types';
 import { exportIndentsToExcel } from '@/lib/excel';
 import { Download } from 'lucide-react';
 import IndentList from '@/components/indents/IndentList';
+import { getIndents } from '@/app/actions/indents';
 
 export default function AllIndentsPage() {
+    const { data: session } = useSession();
     const [indents, setIndents] = useState<Indent[]>([]);
-    const user = auth.getCurrentUser();
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setIndents(db.indents.getAll());
-    }, []);
+        loadIndents();
+    }, [session]);
 
-    if (!user) return null;
+    const loadIndents = async () => {
+        if (!session?.user) return;
+        setLoading(true);
+        const allIndents = await getIndents();
+
+        // Filter logic identical to Dashboard
+        const user = session.user as any;
+        const filtered = user.role === 'REQUESTOR'
+            ? allIndents.filter((i: any) => i.requestorId === user.id)
+            : allIndents;
+
+        setIndents(filtered as Indent[]);
+        setLoading(false);
+    };
+
+    if (!session?.user) return null;
+    if (loading) return <div className="p-8">Loading indents...</div>;
+
+    const user = session.user as any;
 
     return (
         <div>
@@ -32,7 +51,7 @@ export default function AllIndentsPage() {
             <IndentList
                 indents={indents}
                 user={user}
-                refreshData={() => setIndents(db.indents.getAll())}
+                refreshData={loadIndents}
             />
         </div>
     );

@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerUserAction } from '@/app/actions/users';
 import Link from 'next/link';
+import { UserRole } from '@/types';
 
 export default function RegisterPage() {
     const router = useRouter();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [role, setRole] = useState<UserRole>('REQUESTOR');
     const [msg, setMsg] = useState({ type: '', text: '' });
 
     const handleRegister = async (e: React.FormEvent) => {
@@ -22,13 +24,14 @@ export default function RegisterPage() {
         }
 
         // Call Server Action
-        const result = await registerUserAction(name, email, password);
+        const result = await registerUserAction(name, email, password, role);
 
         if (result.success) {
             setMsg({ type: 'success', text: 'Registration successful! Please wait for Admin approval before logging in.' });
             setName('');
             setEmail('');
             setPassword('');
+            setRole('REQUESTOR');
         } else {
             setMsg({ type: 'danger', text: result.error || 'Registration failed.' });
         }
@@ -74,6 +77,23 @@ export default function RegisterPage() {
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 required
                                             />
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <label className="mb-2 text-muted" htmlFor="role">Role</label>
+                                            <select
+                                                id="role"
+                                                className="form-control"
+                                                name="role"
+                                                value={role}
+                                                onChange={(e) => setRole(e.target.value as UserRole)}
+                                                required
+                                            >
+                                                <option value="REQUESTOR">Requestor</option>
+                                                <option value="APPROVER_AS3">Approver (AS3)</option>
+                                                <option value="APPROVER_S3">Approver (S3)</option>
+                                                <option value="APPROVER_MTC">Approver (MTC)</option>
+                                            </select>
                                         </div>
 
                                         <div className="mb-3">

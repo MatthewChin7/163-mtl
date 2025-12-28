@@ -68,7 +68,7 @@ export interface ApprovalLog {
 
 export interface Indent {
     id: string;
-    serialNumber: string;
+    serialNumber: number;
     requestorId: string;
     createdAt: string;
     status: IndentStatus;
