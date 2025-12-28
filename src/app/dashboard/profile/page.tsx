@@ -136,8 +136,8 @@ export default function ProfilePage() {
                             onChange={(e) => setRequestedRole(e.target.value as UserRole)}
                         >
                             <option value="REQUESTOR">Requestor</option>
-                            <option value="APPROVER_AS3">Approver (AS3)</option>
-                            <option value="APPROVER_S3">Approver (S3)</option>
+                            <option value="APPROVER_AS3">Initial Approver (MT POC)</option>
+                            <option value="APPROVER_S3">Final Approver (S3, DyCO, CO)</option>
                             <option value="APPROVER_MTC">Approver (MTC)</option>
                         </select>
                         <button className="btn btn-primary" onClick={handleRequestRole}>Request Change</button>

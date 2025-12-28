@@ -103,7 +103,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             </div>
                             <div style={{ flex: 1, overflow: 'hidden' }}>
                                 <div style={{ fontSize: '0.875rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user.name}</div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--fg-secondary)' }}>{user.role}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--fg-secondary)' }}>
+                                    {user.role === 'ADMIN' ? 'Admin' :
+                                        user.role === 'APPROVER_AS3' ? 'Initial Approver' :
+                                            user.role === 'APPROVER_S3' ? 'Final Approver' :
+                                                user.role.replace('APPROVER_', '')}
+                                </div>
                             </div>
                         </div>
                     </Link>

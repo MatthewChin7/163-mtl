@@ -275,7 +275,11 @@ export default function IndentList({ indents, user, refreshData }: IndentListPro
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Approval Log</h3>
                             {selectedIndent.approvalLogs.map((log, i) => (
                                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                                    <span>{log.stage.replace('APPROVER_', '')} ({log.approverName})</span>
+                                    <span>
+                                        {log.stage === 'APPROVER_AS3' ? 'Initial Approver' :
+                                            log.stage === 'APPROVER_S3' ? 'Final Approver' :
+                                                log.stage.replace('APPROVER_', '')} ({log.approverName})
+                                    </span>
                                     <span style={{ color: log.status === 'APPROVED' ? 'var(--status-success)' : 'var(--status-danger)' }}>{log.status}</span>
                                 </div>
                             ))}

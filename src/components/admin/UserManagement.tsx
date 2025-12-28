@@ -170,7 +170,13 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                             <label className="text-xs font-semibold uppercase text-gray-500">Role</label>
                             <select className="input" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}>
                                 {availableRoles.map(r => (
-                                    <option key={r} value={r}>{r === 'ADMIN' ? 'ADMIN' : r}</option>
+                                    <option key={r} value={r}>
+                                        {r === 'ADMIN' ? 'Admin' :
+                                            r === 'APPROVER_AS3' ? 'Initial Approver (MT POC)' :
+                                                r === 'APPROVER_S3' ? 'Final Approver (S3, DyCO, CO)' :
+                                                    r === 'APPROVER_MTC' ? 'Approver (MTC)' :
+                                                        'Requestor'}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -308,9 +314,9 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                 className="input py-1 px-2 text-xs"
                                             >
                                                 <option value="REQUESTOR">Requestor</option>
-                                                <option value="APPROVER_AS3">AS3</option>
-                                                <option value="APPROVER_S3">S3</option>
-                                                <option value="APPROVER_MTC">MTC</option>
+                                                <option value="APPROVER_AS3">Initial Approver (MT POC)</option>
+                                                <option value="APPROVER_S3">Final Approver (S3, DyCO, CO)</option>
+                                                <option value="APPROVER_MTC">Approver (MTC)</option>
                                                 <option value="ADMIN">Admin</option>
                                             </select>
                                         ) : (
@@ -323,7 +329,10 @@ export default function UserManagement({ currentUser }: UserManagementProps) {
                                                 fontWeight: 600,
                                                 border: u.role !== 'ADMIN' ? '1px solid var(--border-subtle)' : 'none'
                                             }}>
-                                                {u.role === 'ADMIN' ? 'ADMIN' : u.role.replace('APPROVER_', '')}
+                                                {u.role === 'ADMIN' ? 'ADMIN' :
+                                                    u.role === 'APPROVER_AS3' ? 'Initial Approver' :
+                                                        u.role === 'APPROVER_S3' ? 'Final Approver' :
+                                                            u.role.replace('APPROVER_', '')}
                                             </span>
                                         )}
                                     </td>
