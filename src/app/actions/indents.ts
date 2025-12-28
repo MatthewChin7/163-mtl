@@ -118,7 +118,6 @@ export async function updateIndentStatus(indentId: string, status: IndentStatus,
             } else {
                 nextStatus = 'PENDING_AS3'; // Default reset if unknown
             }
-            // Log as "Accepted Changes"
             logs.push({
                 stage: 'REQUESTOR',
                 status: 'APPROVED',
@@ -128,16 +127,48 @@ export async function updateIndentStatus(indentId: string, status: IndentStatus,
                 reason: 'Accepted Changes'
             });
         }
+        // CANCELLATION WORKFLOW
+        else if (status === 'CANCEL_PENDING_AS3') {
+            // Requestor initiating cancellation
+            nextStatus = 'CANCEL_PENDING_AS3';
+            logs.push({
+                stage: 'REQUESTOR',
+                status: 'CANCEL_REQUESTED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Requestor',
+                reason: reason || 'Cancellation Requested'
+            });
+        }
+        else if (current.status.startsWith('CANCEL_PENDING_') && status === 'APPROVED') {
+            // Approving Cancellation
+            if (current.status === 'CANCEL_PENDING_AS3') nextStatus = 'CANCEL_PENDING_S3';
+            else if (current.status === 'CANCEL_PENDING_S3') nextStatus = 'CANCEL_PENDING_MTC';
+            else if (current.status === 'CANCEL_PENDING_MTC') nextStatus = 'CANCELLED';
+
+            logs.push({
+                stage: approverRole,
+                status: 'CANCEL_APPROVED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Unknown',
+                reason: reason || 'Cancellation Approved'
+            });
+        }
+        else if (current.status.startsWith('CANCEL_PENDING_') && status === 'REJECTED') {
+            // Rejecting Cancellation -> Revert to APPROVED (Indent remains valid)
+            nextStatus = 'APPROVED';
+            logs.push({
+                stage: approverRole,
+                status: 'CANCEL_REJECTED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Unknown',
+                reason: reason || 'Cancellation Rejected'
+            });
+        }
         // NORMAL APPROVAL LOGIC
         else if (status === 'APPROVED') {
-            // Usually passed explicitly by frontend (e.g. approveIndent passes the TARGET status),
-            // OR we calculate next status here.
-            // Requirement: "If initial approver rejects, indent stops." (Handled by passing REJECTED).
-            // Requirement: "Requestor... goes up chain".
-            // If the UI passes 'APPROVED' (final status), fine.
-            // But usually UI sends the *Next Pending* status.
-            // Let's assume UI knows best for now to avoid breaking existing flows, unless it's the Requestor case above.
-
             logs.push({
                 stage: approverRole,
                 status: 'APPROVED',
@@ -147,8 +178,18 @@ export async function updateIndentStatus(indentId: string, status: IndentStatus,
                 reason
             });
         }
+        else if (status === 'CANCELLED') {
+            logs.push({
+                stage: approverRole,
+                status: 'CANCELLED',
+                timestamp: new Date().toISOString(),
+                approverId,
+                approverName: approver?.name || 'Unknown',
+                reason: reason || 'Indent Withdrawn'
+            });
+        }
         else {
-            // REJECTION
+            // REJECTION (Normal)
             logs.push({
                 stage: approverRole,
                 status: 'REJECTED',

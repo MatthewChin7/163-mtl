@@ -8,10 +8,14 @@ import { Download } from 'lucide-react';
 import IndentList from '@/components/indents/IndentList';
 import { getIndents } from '@/app/actions/indents';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function AllIndentsPage() {
     const { data: session } = useSession();
     const [indents, setIndents] = useState<Indent[]>([]);
     const [loading, setLoading] = useState(true);
+    const searchParams = useSearchParams();
+    const filter = (searchParams.get('status') || 'ALL') as any;
 
     useEffect(() => {
         loadIndents();
@@ -40,7 +44,11 @@ export default function AllIndentsPage() {
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>All Indents</h1>
+                <h1 style={{ fontSize: '1.875rem', fontWeight: 700 }}>
+                    {filter === 'ALL' ? 'All Indents' :
+                        filter === 'CANCELLED' ? 'History' :
+                            filter.charAt(0) + filter.slice(1).toLowerCase().replace('_', ' ')}
+                </h1>
                 <button
                     onClick={() => exportIndentsToExcel(indents)}
                     className="btn btn-primary"
@@ -52,6 +60,7 @@ export default function AllIndentsPage() {
                 indents={indents}
                 user={user}
                 refreshData={loadIndents}
+                filter={filter}
             />
         </div>
     );

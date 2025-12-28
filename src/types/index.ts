@@ -18,6 +18,9 @@ export type IndentStatus =
     | 'PENDING_S3'
     | 'PENDING_MTC'
     | 'APPROVED'
+    | 'CANCEL_PENDING_AS3'
+    | 'CANCEL_PENDING_S3'
+    | 'CANCEL_PENDING_MTC'
     | 'REJECTED'
     | 'CANCELLED';
 

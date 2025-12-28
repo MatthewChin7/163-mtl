@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import {
-    getVehicleConfigs, toggleVehicle, addVehicle,
-    getLocationConfigs, toggleLocation, addLocation,
+    getVehicleConfigs, toggleVehicle, addVehicle, deleteVehicle,
+    getLocationConfigs, toggleLocation, addLocation, deleteLocation,
     getRPLSchedule, deleteRPL, addRPLTime,
     getSystemSettings, updateSystemSetting
 } from '@/app/actions/config';
@@ -41,9 +41,15 @@ export default function AdminConfigPage() {
     }, [refreshKey]);
 
     // Handlers
-    const handleToggleInfo = async (type: 'VEHICLE' | 'LOCATION', id: string, current: boolean) => {
-        if (type === 'VEHICLE') await toggleVehicle(id, !current);
-        if (type === 'LOCATION') await toggleLocation(id, !current);
+    const handleDeleteVehicle = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this vehicle?")) return;
+        await deleteVehicle(id);
+        refresh();
+    };
+
+    const handleDeleteLocation = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this location?")) return;
+        await deleteLocation(id);
         refresh();
     };
 
@@ -176,13 +182,14 @@ export default function AdminConfigPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {vehicles.map(v => (
-                                <div key={v.id} className={`p-4 rounded-lg border flex justify-between items-center ${v.isActive ? 'bg-card border-border' : 'bg-muted opacity-60'}`}>
+                                <div key={v.id} className="p-4 rounded-lg border flex justify-between items-center bg-card border-border">
                                     <span className="font-medium">{v.name}</span>
                                     <button
-                                        onClick={() => handleToggleInfo('VEHICLE', v.id, v.isActive)}
-                                        className={`btn btn-sm btn-ghost ${v.isActive ? 'text-green-600' : 'text-red-500'}`}
+                                        onClick={() => handleDeleteVehicle(v.id)}
+                                        className="btn btn-sm btn-ghost text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                        title="Delete Vehicle"
                                     >
-                                        <Power size={16} />
+                                        <Trash2 size={16} />
                                     </button>
                                 </div>
                             ))}
@@ -216,12 +223,18 @@ export default function AdminConfigPage() {
                             <h3 className="font-semibold text-lg border-b pb-2">In Camp</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {locations.filter(l => l.category === 'IN_CAMP').map(l => (
-                                    <div key={l.id} className={`p-3 rounded border flex justify-between items-center ${l.isActive ? 'bg-card' : 'bg-muted opacity-60'}`}>
+                                    <div key={l.id} className="p-3 rounded border flex justify-between items-center bg-card">
                                         <div>
                                             <div className="font-medium">{l.name}</div>
                                             {l.restrictedAuthority && <div className="text-xs text-orange-500 flex items-center gap-1"><AlertTriangle size={10} /> Restricted: {l.restrictedAuthority}</div>}
                                         </div>
-                                        <button onClick={() => handleToggleInfo('LOCATION', l.id, l.isActive)} className="btn btn-sm btn-ghost"><Power size={16} /></button>
+                                        <button
+                                            onClick={() => handleDeleteLocation(l.id)}
+                                            className="btn btn-sm btn-ghost text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                            title="Delete Location"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -229,11 +242,17 @@ export default function AdminConfigPage() {
                             <h3 className="font-semibold text-lg border-b pb-2 mt-6">Out Camp</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {locations.filter(l => l.category === 'OUT_CAMP').map(l => (
-                                    <div key={l.id} className={`p-3 rounded border flex justify-between items-center ${l.isActive ? 'bg-card' : 'bg-muted opacity-60'}`}>
+                                    <div key={l.id} className="p-3 rounded border flex justify-between items-center bg-card">
                                         <div>
                                             <div className="font-medium">{l.name}</div>
                                         </div>
-                                        <button onClick={() => handleToggleInfo('LOCATION', l.id, l.isActive)} className="btn btn-sm btn-ghost"><Power size={16} /></button>
+                                        <button
+                                            onClick={() => handleDeleteLocation(l.id)}
+                                            className="btn btn-sm btn-ghost text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                            title="Delete Location"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>

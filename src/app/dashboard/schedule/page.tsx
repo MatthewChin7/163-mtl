@@ -25,6 +25,7 @@ export default function SchedulePage() {
     const [locationFilter, setLocationFilter] = useState('');
     const [vehicleTypeFilter, setVehicleTypeFilter] = useState('ALL');
     const [showOnlyMyIndents, setShowOnlyMyIndents] = useState(false);
+    const [approvedOnly, setApprovedOnly] = useState(true);
 
     // Derived user from session
     const user = session?.user;
@@ -60,6 +61,9 @@ export default function SchedulePage() {
                 if (showOnlyMyIndents && user) {
                     filtered = filtered.filter((i: Indent) => i.requestorId === user.id);
                 }
+                if (approvedOnly) {
+                    filtered = filtered.filter((i: Indent) => i.status === 'APPROVED');
+                }
 
                 // Sort by start time
                 filtered.sort((a: Indent, b: Indent) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -72,7 +76,7 @@ export default function SchedulePage() {
         };
 
         fetchData();
-    }, [dateRange, locationFilter, vehicleTypeFilter, showOnlyMyIndents, user]);
+    }, [dateRange, locationFilter, vehicleTypeFilter, showOnlyMyIndents, approvedOnly, user]);
 
     const handlePreviousWeek = () => {
         setDateRange(prev => ({
@@ -139,6 +143,19 @@ export default function SchedulePage() {
                             value={locationFilter}
                             onChange={(e) => setLocationFilter(e.target.value)}
                         />
+                    </div>
+
+                    <div className="glass-panel" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            id="approvedOnly"
+                            checked={approvedOnly}
+                            onChange={(e) => setApprovedOnly(e.target.checked)}
+                            style={{ width: '1rem', height: '1rem' }}
+                        />
+                        <label htmlFor="approvedOnly" style={{ fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer' }}>
+                            Approved Only
+                        </label>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
                         <button onClick={handlePreviousWeek} className="btn btn-ghost" style={{ padding: '0.5rem' }}><ChevronLeft size={20} /></button>

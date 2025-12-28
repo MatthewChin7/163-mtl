@@ -70,6 +70,16 @@ export async function addVehicle(name: string) {
     }
 }
 
+export async function deleteVehicle(id: string) {
+    try {
+        await prisma.vehicleConfig.delete({ where: { id } });
+        revalidatePath('/dashboard/admin/config');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: 'Failed to delete vehicle' };
+    }
+}
+
 // --- Locations ---
 export async function getLocationConfigs() {
     return await prisma.locationConfig.findMany({
@@ -106,6 +116,16 @@ export async function toggleLocation(id: string, isActive: boolean) {
         return { success: true };
     } catch (e) {
         return { success: false, error: 'Failed to toggle location' };
+    }
+}
+
+export async function deleteLocation(id: string) {
+    try {
+        await prisma.locationConfig.delete({ where: { id } });
+        revalidatePath('/dashboard/admin/config');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: 'Failed to delete location' };
     }
 }
 

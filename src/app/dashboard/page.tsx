@@ -72,32 +72,19 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {indents.length === 0 ? (
-                <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center' }}>
-                    <div style={{ marginBottom: '1rem', fontSize: '3rem' }}>🚛</div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>No Indents Found</h3>
-                    <p style={{ color: 'var(--fg-secondary)', marginBottom: '1.5rem' }}>Get started by creating your first transport request.</p>
-                    {user.role === 'REQUESTOR' && (
-                        <Link href="/dashboard/new-indent" className="btn btn-primary">
-                            Create Indent
-                        </Link>
-                    )}
+            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontWeight: 600 }}>
+                        {user.role.startsWith('APPROVER') ? 'Pending Approvals & Recent' : 'Your Indents'}
+                    </h3>
+                    <Link href="/dashboard/indents" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontSize: '0.875rem' }}>View All →</Link>
                 </div>
-            ) : (
-                <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <h3 style={{ fontWeight: 600 }}>
-                            {user.role.startsWith('APPROVER') ? 'Pending Approvals & Recent' : 'Your Indents'}
-                        </h3>
-                        <Link href="/dashboard/indents" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontSize: '0.875rem' }}>View All →</Link>
-                    </div>
-                    <IndentList
-                        indents={indents.slice(0, 5)} // Show only recent 5 on dashboard
-                        user={user}
-                        refreshData={loadIndents}
-                    />
-                </div>
-            )}
+                <IndentList
+                    indents={indents.slice(0, 5)}
+                    user={user}
+                    refreshData={loadIndents}
+                />
+            </div>
         </div>
     );
 }

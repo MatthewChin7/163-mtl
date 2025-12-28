@@ -34,9 +34,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const navItems = [
         { label: 'Dashboard', href: '/dashboard', icon: PieChart },
         { label: 'New Indent', href: '/dashboard/new-indent', icon: PlusCircle, role: 'REQUESTOR' },
-        { label: 'All Indents', href: '/dashboard/indents', icon: FileText },
+        {
+            label: 'All Indents',
+            href: '/dashboard/indents',
+            icon: FileText,
+            subItems: [
+                { label: 'Drafts', href: '/dashboard/indents?status=DRAFT' },
+                { label: 'Pending', href: '/dashboard/indents?status=PENDING' },
+                { label: 'Approved', href: '/dashboard/indents?status=APPROVED' },
+                { label: 'History', href: '/dashboard/indents?status=CANCELLED' },
+            ]
+        },
         { label: 'Daily MT Schedule', href: '/dashboard/schedule', icon: Calendar },
-        { label: 'Monthly Bulk Indents', href: '/dashboard/bulk-indents', icon: FileText, role: 'APPROVER_AS3' }, // Visible to AS3/S3/MTC via logic below
+        { label: 'Monthly Bulk Indents', href: '/dashboard/bulk-indents', icon: FileText, role: 'APPROVER_AS3' },
         { label: 'In Camp TO Sched', href: '/dashboard/mtc-schedule', icon: UserIcon, role: 'APPROVER_MTC' },
         { label: 'User Management', href: '/dashboard/admin', icon: Users, role: 'ADMIN' },
         { label: 'System Config', href: '/dashboard/admin/config', icon: Settings, role: 'ADMIN' },
@@ -61,37 +71,66 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <div style={{ fontSize: '0.75rem', color: 'var(--fg-secondary)' }}>Transport Management</div>
                 </div>
 
-                <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto' }}>
                     {navItems.map((item) => {
                         // Custom logic for Monthly Bulk: Visible to AS3, S3, MTC
                         if (item.label === 'Monthly Bulk Indents') {
                             if (!['APPROVER_AS3', 'APPROVER_S3', 'APPROVER_MTC'].includes(user.role)) return null;
                         }
-                        else if (item.role && user.role !== item.role && user.role !== 'ADMIN') return null; // Simple RBAC for others
+                        else if (item.role && user.role !== item.role && user.role !== 'ADMIN') return null;
 
-                        const isActive = pathname === item.href;
+                        const isActive = pathname === item.href && !item.subItems; // Only active if exact match or simple item
                         const Icon = item.icon;
+                        const hasActiveChild = item.subItems?.some(sub => pathname === sub.href.split('?')[0] && window.location.search === sub.href.split('?')[1]);
 
                         return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.75rem',
-                                    padding: '0.75rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    color: isActive ? 'white' : 'var(--fg-secondary)',
-                                    background: isActive ? 'var(--accent-primary)' : 'transparent',
-                                    textDecoration: 'none',
-                                    fontWeight: 500,
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <Icon size={18} />
-                                {item.label}
-                            </Link>
+                            <div key={item.href}>
+                                <Link
+                                    href={item.href}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.75rem',
+                                        padding: '0.75rem',
+                                        borderRadius: 'var(--radius-md)',
+                                        color: isActive ? 'white' : 'var(--fg-secondary)',
+                                        background: isActive ? 'var(--accent-primary)' : 'transparent',
+                                        textDecoration: 'none',
+                                        fontWeight: 500,
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    <Icon size={18} />
+                                    {item.label}
+                                </Link>
+                                {item.subItems && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                                        {item.subItems.map(sub => {
+                                            // Simple check for query param match if needed, but pathname check is cleaner.
+                                            // Since usePathname doesn't include query, we need to be careful.
+                                            // Actually, client side isActive check for query params is tricky without useSearchParams.
+                                            // For now, let's just make them links.
+                                            return (
+                                                <Link
+                                                    key={sub.href}
+                                                    href={sub.href}
+                                                    style={{
+                                                        padding: '0.5rem 0.75rem 0.5rem 3rem',
+                                                        fontSize: '0.875rem',
+                                                        color: 'var(--fg-secondary)',
+                                                        textDecoration: 'none',
+                                                        display: 'block',
+                                                        opacity: 0.8
+                                                    }}
+                                                    className="hover:opacity-100"
+                                                >
+                                                    {sub.label}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
                 </nav>
