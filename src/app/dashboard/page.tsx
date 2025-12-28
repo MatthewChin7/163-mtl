@@ -20,7 +20,7 @@ export default function DashboardPage() {
     const loadIndents = async () => {
         if (!session?.user) return;
         setLoading(true);
-        const allIndents = await getIndents();
+        const allIndents = await getIndents((session.user as any).id);
 
         // Filter: Requestors only see their own. Approvers/Admin see all.
         // (Ideally filtering happens on server, but doing here for MVP fix)

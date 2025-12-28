@@ -29,9 +29,20 @@ export async function createIndent(data: any, userId: string, initialStatus: Ind
     }
 }
 
-export async function getIndents() {
+export async function getIndents(userId?: string) {
     try {
         const indents = await prisma.indent.findMany({
+            where: {
+                OR: [
+                    { status: { not: 'DRAFT' } }, // Show all non-drafts
+                    {
+                        AND: [
+                            { status: 'DRAFT' },
+                            { requestorId: userId } // Show drafts only if owner
+                        ]
+                    }
+                ]
+            },
             include: {
                 requestor: true
             },

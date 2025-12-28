@@ -20,7 +20,7 @@ export default function AllIndentsPage() {
     const loadIndents = async () => {
         if (!session?.user) return;
         setLoading(true);
-        const allIndents = await getIndents();
+        const allIndents = await getIndents((session.user as any).id);
 
         // Filter logic identical to Dashboard
         const user = session.user as any;

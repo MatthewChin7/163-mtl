@@ -55,9 +55,9 @@ export default function ProfilePage() {
         const res = await updateUserProfile(user.id, updateData);
 
         if (res.success) {
-            alert("Profile updated successfully");
+            alert("Profile updated successfully. Page will reload to update session.");
             setFormData(prev => ({ ...prev, password: '' })); // Clear password field
-            router.refresh();
+            window.location.reload(); // Force reload to refresh session token data
         } else {
             alert("Update failed: " + res.error);
         }
